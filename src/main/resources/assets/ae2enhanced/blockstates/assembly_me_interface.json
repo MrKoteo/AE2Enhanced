@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "normal": {
+      "model": "ae2enhanced:assembly_me_interface"
+    },
+    "inventory": {
+      "model": "ae2enhanced:assembly_me_interface"
+    }
+  }
+}
