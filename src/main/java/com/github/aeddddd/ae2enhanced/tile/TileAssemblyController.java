@@ -423,8 +423,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     }
 
     /**
-     * 供 Mixin 调用：批量执行虚拟合成，一次性注入 batchSize 份产物。
-     * 先 SIMULATE 预检，全部通过后才 MODULATE 实际注入。
+     * 供 Mixin 调用：批量执行虚拟合成，一次性扣除原材料并注入 batchSize 份产物。
      */
     public boolean executeBatch(ICraftingPatternDetails details, long batchSize) {
         if (world == null || world.isRemote || activeMeInterfacePos == null) return false;
@@ -441,13 +440,34 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         IItemStorageChannel channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
         IMEMonitor<IAEItemStack> monitor = storage.getInventory(channel);
 
+        IAEItemStack[] condensedInputs = details.getCondensedInputs();
         IAEItemStack[] condensedOutputs = details.getCondensedOutputs();
         if (condensedOutputs == null || condensedOutputs.length == 0) return false;
 
-        // 直接 MODULATE 注入（移除 SIMULATE 预检，避免网络容量误判导致回退）
+        // 1. SIMULATE 检查原材料是否足够
+        for (IAEItemStack inputTemplate : condensedInputs) {
+            if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
+            long totalNeed = inputTemplate.getStackSize() * batchSize;
+            IAEItemStack aeInput = inputTemplate.copy();
+            aeInput.setStackSize(totalNeed);
+            IAEItemStack extracted = monitor.extractItems(aeInput, Actionable.SIMULATE, getEffectiveSource());
+            if (extracted == null || extracted.getStackSize() < totalNeed) {
+                return false; // 原材料不足
+            }
+        }
+
+        // 2. MODULATE 扣除原材料
+        for (IAEItemStack inputTemplate : condensedInputs) {
+            if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
+            long totalNeed = inputTemplate.getStackSize() * batchSize;
+            IAEItemStack aeInput = inputTemplate.copy();
+            aeInput.setStackSize(totalNeed);
+            monitor.extractItems(aeInput, Actionable.MODULATE, getEffectiveSource());
+        }
+
+        // 3. MODULATE 注入产物
         for (IAEItemStack outputTemplate : condensedOutputs) {
             if (outputTemplate == null || outputTemplate.getStackSize() <= 0) continue;
-
             long totalCount = outputTemplate.getStackSize() * batchSize;
             if (totalCount <= 0) return false;
 
@@ -456,7 +476,6 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
             IAEItemStack remainder = monitor.injectItems(aeOutput, Actionable.MODULATE, getEffectiveSource());
             if (remainder != null && remainder.getStackSize() > 0) {
-                // 网络满载，剩余部分放入 pendingOutputs 后续再注入
                 long remCount = remainder.getStackSize();
                 while (remCount > 0) {
                     ItemStack proto = outputTemplate.createItemStack();

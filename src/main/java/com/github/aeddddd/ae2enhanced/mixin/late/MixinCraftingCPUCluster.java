@@ -60,7 +60,8 @@ public class MixinCraftingCPUCluster {
 
     private static Method getWaitingForAdd(Object waitingFor) throws NoSuchMethodException {
         if (waitingForAddMethod == null) {
-            waitingForAddMethod = waitingFor.getClass().getMethod("addStorage", IAEItemStack.class);
+            // AE2 executeCrafting 中使用的是 IItemContainer.add() 而非 addStorage()
+            waitingForAddMethod = waitingFor.getClass().getMethod("add", IAEItemStack.class);
         }
         return waitingForAddMethod;
     }
