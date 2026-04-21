@@ -8,8 +8,9 @@ import com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface;
 import net.minecraft.inventory.InventoryCrafting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
@@ -23,26 +24,24 @@ public class MixinCraftingCPUCluster {
      * 如果 provider 是 Assembly Hub 且样板已缓存为虚拟合成，
      * 尝试批量执行剩余全部份数。
      */
-    private static int debugCallCount = 0;
-    private static boolean debugInjected = false;
+    private static boolean debugLogged = false;
 
     @Inject(method = "executeCrafting", at = @At("HEAD"))
     private void onExecuteCrafting(CallbackInfo ci) {
-        if (!debugInjected) {
-            debugInjected = true;
+        if (!debugLogged) {
+            debugLogged = true;
             System.out.println("[AE2E-DEBUG] MixinCraftingCPUCluster.executeCrafting inject WORKING");
         }
     }
 
-    @Redirect(
+    @WrapOperation(
             method = "executeCrafting",
             at = @At(
                     value = "INVOKE",
                     target = "Lappeng/api/networking/crafting/ICraftingMedium;pushPattern(Lappeng/api/networking/crafting/ICraftingPatternDetails;Lnet/minecraft/inventory/InventoryCrafting;)Z"
             )
     )
-    private boolean redirectPushPattern(ICraftingMedium provider, ICraftingPatternDetails details, InventoryCrafting table) {
-        debugCallCount++;
+    private boolean wrapPushPattern(ICraftingMedium provider, ICraftingPatternDetails details, InventoryCrafting table, Operation<Boolean> original) {
         if (provider instanceof TileAssemblyMeInterface) {
             TileAssemblyController controller = ((TileAssemblyMeInterface) provider).getController();
             if (controller != null) {
@@ -52,11 +51,8 @@ public class MixinCraftingCPUCluster {
                 try {
                     boolean isVirtual = controller.isVirtualPattern(details);
                     long remaining = getRemainingValue(details);
-                    if (debugCallCount <= 5 || (debugCallCount % 100 == 0)) {
-                        System.out.println("[AE2E-DEBUG] pushPattern call #" + debugCallCount
-                            + " isVirtual=" + isVirtual
-                            + " remaining=" + remaining
-                            + " controller=" + controller.getPos());
+                    if (!debugLogged) {
+                        System.out.println("[AE2E-DEBUG] wrapPushPattern isVirtual=" + isVirtual + " remaining=" + remaining);
                     }
                     if (isVirtual && remaining > 0) {
                         boolean success = controller.executeBatch(details, remaining);
@@ -66,13 +62,13 @@ public class MixinCraftingCPUCluster {
                             return true;
                         }
                     }
-                    return provider.pushPattern(details, table);
+                    return original.call(provider, details, table);
                 } finally {
                     controller.setCurrentActionSource(null);
                 }
             }
         }
-        return provider.pushPattern(details, table);
+        return original.call(provider, details, table);
     }
 
     /**
