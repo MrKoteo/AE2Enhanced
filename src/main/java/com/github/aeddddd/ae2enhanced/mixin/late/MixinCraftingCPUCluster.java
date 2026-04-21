@@ -26,21 +26,12 @@ public class MixinCraftingCPUCluster {
     private static Field tasksField;
     private static Field waitingForField;
     private static Field remOpsField;
-    private static Method postChangeMethod;
+    private static Field remItemCountField;
+    private static Method postCraftingStatusChange;
+    private static Method postChange;
     private static Field taskProgressValueField;
     private static Method waitingForAddMethod;
     private static boolean reflectionReady = false;
-
-    // ---- 调试日志控制 ----
-    private static int debugLogCount = 0;
-    private static final int MAX_DEBUG_LOGS = 30;
-
-    private static void debugLog(String msg) {
-        if (debugLogCount < MAX_DEBUG_LOGS) {
-            debugLogCount++;
-            System.out.println("[AE2E-DEBUG] " + msg);
-        }
-    }
 
     private static void initReflection() throws Exception {
         if (reflectionReady) return;
@@ -50,8 +41,12 @@ public class MixinCraftingCPUCluster {
         waitingForField.setAccessible(true);
         remOpsField = CraftingCPUCluster.class.getDeclaredField("remainingOperations");
         remOpsField.setAccessible(true);
-        postChangeMethod = CraftingCPUCluster.class.getDeclaredMethod("postCraftingStatusChange", IAEItemStack.class);
-        postChangeMethod.setAccessible(true);
+        remItemCountField = CraftingCPUCluster.class.getDeclaredField("remainingItemCount");
+        remItemCountField.setAccessible(true);
+        postCraftingStatusChange = CraftingCPUCluster.class.getDeclaredMethod("postCraftingStatusChange", IAEItemStack.class);
+        postCraftingStatusChange.setAccessible(true);
+        postChange = CraftingCPUCluster.class.getDeclaredMethod("postChange", IAEItemStack.class, appeng.api.networking.security.IActionSource.class);
+        postChange.setAccessible(true);
         Class<?> taskProgressClass = Class.forName("appeng.me.cluster.implementations.CraftingCPUCluster$TaskProgress");
         taskProgressValueField = taskProgressClass.getDeclaredField("value");
         taskProgressValueField.setAccessible(true);
@@ -60,7 +55,6 @@ public class MixinCraftingCPUCluster {
 
     private static Method getWaitingForAdd(Object waitingFor) throws NoSuchMethodException {
         if (waitingForAddMethod == null) {
-            // AE2 executeCrafting 中使用的是 IItemContainer.add() 而非 addStorage()
             waitingForAddMethod = waitingFor.getClass().getMethod("add", IAEItemStack.class);
         }
         return waitingForAddMethod;
@@ -73,51 +67,49 @@ public class MixinCraftingCPUCluster {
             CraftingCPUCluster cpu = (CraftingCPUCluster) (Object) this;
 
             Map<ICraftingPatternDetails, Object> tasks = (Map<ICraftingPatternDetails, Object>) tasksField.get(cpu);
-            debugLog("tasks.size=" + tasks.size());
             if (tasks.isEmpty()) return;
 
             Object waitingFor = waitingForField.get(cpu);
             Method waitingForAdd = getWaitingForAdd(waitingFor);
             int remainingOps = remOpsField.getInt(cpu);
+            long remainingItemCount = remItemCountField.getLong(cpu);
 
             for (Map.Entry<ICraftingPatternDetails, Object> entry : new ArrayList<>(tasks.entrySet())) {
                 ICraftingPatternDetails details = entry.getKey();
                 Object progress = entry.getValue();
+
                 long remaining = taskProgressValueField.getLong(progress);
-                debugLog("task remaining=" + remaining);
                 if (remaining <= 0) continue;
 
                 List<ICraftingMedium> mediums = cache.getMediums(details);
-                debugLog("mediums.size=" + (mediums == null ? 0 : mediums.size()));
                 if (mediums == null || mediums.isEmpty()) continue;
 
                 for (ICraftingMedium medium : mediums) {
-                    debugLog("medium class=" + medium.getClass().getName());
                     if (!(medium instanceof TileAssemblyMeInterface)) continue;
 
                     TileAssemblyController controller = ((TileAssemblyMeInterface) medium).getController();
-                    debugLog("controller=" + controller + " pos=" + (controller != null ? controller.getPos() : null));
-                    if (controller == null) continue;
-
-                    boolean isVirtual = controller.isVirtualPattern(details);
-                    debugLog("isVirtual=" + isVirtual);
-                    if (!isVirtual) continue;
+                    if (controller == null || !controller.isVirtualPattern(details)) continue;
 
                     appeng.api.networking.security.IActionSource source = cpu.getActionSource();
                     controller.setCurrentActionSource(source);
                     try {
                         boolean success = controller.executeBatch(details, remaining);
-                        debugLog("executeBatch remaining=" + remaining + " success=" + success);
                         if (success) {
                             taskProgressValueField.setLong(progress, 0);
                             remainingOps -= remaining;
+                            remainingItemCount -= remaining;
 
                             for (IAEItemStack outputTemplate : details.getCondensedOutputs()) {
                                 if (outputTemplate == null || outputTemplate.getStackSize() <= 0) continue;
                                 IAEItemStack expected = outputTemplate.copy();
                                 expected.setStackSize(outputTemplate.getStackSize() * remaining);
-                                waitingForAdd.invoke(waitingFor, expected);
-                                postChangeMethod.invoke(cpu, expected.copy());
+
+                                // 1. 通知监听器（终端等）
+                                postChange.invoke(cpu, expected.copy(), source);
+                                // 2. 添加预期产物到 waitingFor
+                                waitingForAdd.invoke(waitingFor, expected.copy());
+                                // 3. 通知 AE2 crafting grid 状态变化
+                                postCraftingStatusChange.invoke(cpu, expected.copy());
                             }
 
                             System.out.println("[AE2E] BATCH success: remaining=" + remaining);
@@ -132,8 +124,11 @@ public class MixinCraftingCPUCluster {
             if (remainingOps != remOpsField.getInt(cpu)) {
                 remOpsField.setInt(cpu, remainingOps);
             }
+            if (remainingItemCount != remItemCountField.getLong(cpu)) {
+                remItemCountField.setLong(cpu, remainingItemCount);
+            }
         } catch (Exception e) {
-            debugLog("EXCEPTION: " + e.getClass().getName() + " " + e.getMessage());
+            System.err.println("[AE2E] batchProcessVirtualTasks error: " + e);
             e.printStackTrace();
         }
     }
