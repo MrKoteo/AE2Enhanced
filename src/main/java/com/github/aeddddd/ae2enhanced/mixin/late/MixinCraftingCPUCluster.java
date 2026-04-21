@@ -8,7 +8,9 @@ import com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface;
 import net.minecraft.inventory.InventoryCrafting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -21,6 +23,17 @@ public class MixinCraftingCPUCluster {
      * 如果 provider 是 Assembly Hub 且样板已缓存为虚拟合成，
      * 尝试批量执行剩余全部份数。
      */
+    private static int debugCallCount = 0;
+    private static boolean debugInjected = false;
+
+    @Inject(method = "executeCrafting", at = @At("HEAD"))
+    private void onExecuteCrafting(CallbackInfo ci) {
+        if (!debugInjected) {
+            debugInjected = true;
+            System.out.println("[AE2E-DEBUG] MixinCraftingCPUCluster.executeCrafting inject WORKING");
+        }
+    }
+
     @Redirect(
             method = "executeCrafting",
             at = @At(
@@ -29,32 +42,36 @@ public class MixinCraftingCPUCluster {
             )
     )
     private boolean redirectPushPattern(ICraftingMedium provider, ICraftingPatternDetails details, InventoryCrafting table) {
+        debugCallCount++;
         if (provider instanceof TileAssemblyMeInterface) {
             TileAssemblyController controller = ((TileAssemblyMeInterface) provider).getController();
             if (controller != null) {
-                // 获取 CraftingCPU 的 ActionSource，让 AE2 能正确追踪产物归属
                 CraftingCPUCluster cpu = (CraftingCPUCluster) (Object) this;
                 appeng.api.networking.security.IActionSource source = cpu.getActionSource();
                 controller.setCurrentActionSource(source);
                 try {
-                    if (controller.isVirtualPattern(details)) {
-                        long remaining = getRemainingValue(details);
-                        if (remaining > 0) {
-                            boolean success = controller.executeBatch(details, remaining);
-                            if (success) {
-                                setRemainingValue(details, 0);
-                                return true;
-                            }
+                    boolean isVirtual = controller.isVirtualPattern(details);
+                    long remaining = getRemainingValue(details);
+                    if (debugCallCount <= 5 || (debugCallCount % 100 == 0)) {
+                        System.out.println("[AE2E-DEBUG] pushPattern call #" + debugCallCount
+                            + " isVirtual=" + isVirtual
+                            + " remaining=" + remaining
+                            + " controller=" + controller.getPos());
+                    }
+                    if (isVirtual && remaining > 0) {
+                        boolean success = controller.executeBatch(details, remaining);
+                        System.out.println("[AE2E-DEBUG] BATCH executed: remaining=" + remaining + " success=" + success);
+                        if (success) {
+                            setRemainingValue(details, 0);
+                            return true;
                         }
                     }
-                    // 回退到标准 pushPattern（1 份），用于第一次 cache miss 或真实合成
                     return provider.pushPattern(details, table);
                 } finally {
                     controller.setCurrentActionSource(null);
                 }
             }
         }
-        // 非 Assembly Hub，走原版逻辑
         return provider.pushPattern(details, table);
     }
 
