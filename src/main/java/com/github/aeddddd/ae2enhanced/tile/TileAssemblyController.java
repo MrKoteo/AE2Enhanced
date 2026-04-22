@@ -425,38 +425,6 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     /**
      * 供 Mixin 调用：批量执行虚拟合成，一次性扣除原材料并注入 batchSize 份产物。
      */
-    /**
-     * 二分查找最大可行的 batch size，避免线性回退导致的大数量卡死。
-     * 时间复杂度 O(log batchSize) 次 SIMULATE 调用。
-     */
-    private long findMaxBatchSize(IMEMonitor<IAEItemStack> monitor, IAEItemStack[] condensedInputs, long maxBatch) {
-        long low = 1, high = maxBatch, result = 0;
-        while (low <= high) {
-            long mid = low + (high - low) / 2;
-            if (canSimulateBatch(monitor, condensedInputs, mid)) {
-                result = mid;
-                low = mid + 1;
-            } else {
-                high = mid - 1;
-            }
-        }
-        return result;
-    }
-
-    private boolean canSimulateBatch(IMEMonitor<IAEItemStack> monitor, IAEItemStack[] condensedInputs, long batchSize) {
-        for (IAEItemStack inputTemplate : condensedInputs) {
-            if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
-            long totalNeed = inputTemplate.getStackSize() * batchSize;
-            IAEItemStack aeInput = inputTemplate.copy();
-            aeInput.setStackSize(totalNeed);
-            IAEItemStack extracted = monitor.extractItems(aeInput, Actionable.SIMULATE, getEffectiveSource());
-            if (extracted == null || extracted.getStackSize() < totalNeed) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     public boolean executeBatch(ICraftingPatternDetails details, long batchSize) {
         if (world == null || world.isRemote || activeMeInterfacePos == null) return false;
         if (batchSize <= 0) return false;
@@ -472,36 +440,13 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         IItemStorageChannel channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
         IMEMonitor<IAEItemStack> monitor = storage.getInventory(channel);
 
-        IAEItemStack[] condensedInputs = details.getCondensedInputs();
         IAEItemStack[] condensedOutputs = details.getCondensedOutputs();
         if (condensedOutputs == null || condensedOutputs.length == 0) return false;
 
-        // 1. SIMULATE 检查原材料是否足够，若不足则用二分查找找到最大可行 batch size
-        long actualBatch = findMaxBatchSize(monitor, condensedInputs, batchSize);
-        if (actualBatch <= 0) {
-            return false; // 原材料不足，连 1 份都做不到
-        }
-        if (actualBatch < batchSize) {
-            System.out.println("[AE2E] BATCH fallback: batchSize " + batchSize + " -> " + actualBatch);
-        }
-
-        // 2. MODULATE 扣除原材料
-        for (IAEItemStack inputTemplate : condensedInputs) {
-            if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
-            long totalNeed = inputTemplate.getStackSize() * actualBatch;
-            IAEItemStack aeInput = inputTemplate.copy();
-            aeInput.setStackSize(totalNeed);
-            IAEItemStack extracted = monitor.extractItems(aeInput, Actionable.MODULATE, getEffectiveSource());
-            if (extracted == null || extracted.getStackSize() < totalNeed) {
-                System.out.println("[AE2E] BATCH MODULATE extract FAILED for " + aeInput.createItemStack().getDisplayName() + " need=" + totalNeed + " got=" + (extracted == null ? "null" : extracted.getStackSize()));
-                return false;
-            }
-            System.out.println("[AE2E] BATCH extracted " + extracted.getStackSize() + "x " + extracted.createItemStack().getDisplayName());
-        }
-
-        batchSize = actualBatch; // 后续注入产物用实际 batch size
-
-        // 3. MODULATE 注入产物
+        // 直接注入产物，不碰网络中的原料。
+        // 原料已在 CraftingCPUCluster.submitJob 时预提取到 CPU 的 inventory 中，
+        // 由 AE2 正常 executeCrafting -> pushPattern 流程消耗。
+        // 如果我们从网络中额外提取，会破坏 inventory 余额一致性，导致 canCraft() 失败卡住。
         for (IAEItemStack outputTemplate : condensedOutputs) {
             if (outputTemplate == null || outputTemplate.getStackSize() <= 0) continue;
             long totalCount = outputTemplate.getStackSize() * batchSize;
