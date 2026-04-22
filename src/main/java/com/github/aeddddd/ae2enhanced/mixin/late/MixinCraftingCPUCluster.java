@@ -66,6 +66,7 @@ public class MixinCraftingCPUCluster {
             initReflection();
             CraftingCPUCluster cpu = (CraftingCPUCluster) (Object) this;
 
+            @SuppressWarnings("unchecked")
             Map<ICraftingPatternDetails, Object> tasks = (Map<ICraftingPatternDetails, Object>) tasksField.get(cpu);
             if (tasks.isEmpty()) return;
 
@@ -73,6 +74,9 @@ public class MixinCraftingCPUCluster {
             Method waitingForAdd = getWaitingForAdd(waitingFor);
             int remainingOps = remOpsField.getInt(cpu);
             long remainingItemCount = remItemCountField.getLong(cpu);
+
+            // 收集需要移除的 keys（避免在遍历中修改 map）
+            List<ICraftingPatternDetails> toRemove = new ArrayList<>();
 
             for (Map.Entry<ICraftingPatternDetails, Object> entry : new ArrayList<>(tasks.entrySet())) {
                 ICraftingPatternDetails details = entry.getKey();
@@ -95,7 +99,7 @@ public class MixinCraftingCPUCluster {
                     try {
                         boolean success = controller.executeBatch(details, remaining);
                         if (success) {
-                            taskProgressValueField.setLong(progress, 0);
+                            toRemove.add(details);
                             remainingOps -= remaining;
                             remainingItemCount -= remaining;
 
@@ -104,21 +108,23 @@ public class MixinCraftingCPUCluster {
                                 IAEItemStack expected = outputTemplate.copy();
                                 expected.setStackSize(outputTemplate.getStackSize() * remaining);
 
-                                // 1. 通知监听器（终端等）
                                 postChange.invoke(cpu, expected.copy(), source);
-                                // 2. 添加预期产物到 waitingFor
                                 waitingForAdd.invoke(waitingFor, expected.copy());
-                                // 3. 通知 AE2 crafting grid 状态变化
                                 postCraftingStatusChange.invoke(cpu, expected.copy());
                             }
 
-                            System.out.println("[AE2E] BATCH success: remaining=" + remaining);
+                            System.out.println("[AE2E] BATCH: removed task remaining=" + remaining);
                         }
                     } finally {
                         controller.setCurrentActionSource(null);
                     }
                     break;
                 }
+            }
+
+            // 直接移除已 batch 处理的 tasks entry，阻止 executeCrafting 后续遍历到它们
+            for (ICraftingPatternDetails key : toRemove) {
+                tasks.remove(key);
             }
 
             if (remainingOps != remOpsField.getInt(cpu)) {
