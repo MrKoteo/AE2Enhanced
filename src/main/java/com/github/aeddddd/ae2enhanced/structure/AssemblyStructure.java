@@ -427,6 +427,9 @@ public class AssemblyStructure {
     private static boolean checkBlock(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected) {
         for (BlockPos rel : relativeSet) {
             BlockPos actual = origin.add(rel);
+            if (!world.isBlockLoaded(actual)) {
+                continue; // chunk 未加载，保持当前状态，不判定为缺失
+            }
             if (world.getBlockState(actual).getBlock() != expected) {
                 return false;
             }
@@ -452,6 +455,9 @@ public class AssemblyStructure {
     private static void countMissing(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected, Map<Block, Integer> missing) {
         for (BlockPos rel : relativeSet) {
             BlockPos actual = origin.add(rel);
+            if (!world.isBlockLoaded(actual)) {
+                continue; // chunk 未加载，不计入缺失
+            }
             if (world.getBlockState(actual).getBlock() != expected) {
                 missing.put(expected, missing.getOrDefault(expected, 0) + 1);
             }

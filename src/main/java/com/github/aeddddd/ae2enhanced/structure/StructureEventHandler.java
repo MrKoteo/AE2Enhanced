@@ -64,6 +64,32 @@ public class StructureEventHandler {
         });
     }
 
+    /**
+     * Chunk 加载时：如果该 chunk 包含 ControllerIndex 中记录的控制器，将其加入待验证队列。
+     * 这保证存档重进后，已成型结构能在 chunk 加载完毕后自动重新验证，避免因加载顺序导致的误判解散。
+     */
+    @SubscribeEvent
+    public static void onChunkLoad(net.minecraftforge.event.world.ChunkEvent.Load event) {
+        if (event.getWorld().isRemote) return;
+        World world = event.getWorld();
+        ControllerIndex index = ControllerIndex.get(world);
+        if (index == null) return;
+
+        net.minecraft.world.chunk.Chunk chunk = event.getChunk();
+        int chunkX = chunk.x;
+        int chunkZ = chunk.z;
+
+        for (BlockPos controllerPos : index.getAll()) {
+            if (world.provider.getDimension() != chunk.getWorld().provider.getDimension()) continue;
+            int cx = controllerPos.getX() >> 4;
+            int cz = controllerPos.getZ() >> 4;
+            // 控制器所在 chunk 已加载，且 8 格半径内的结构 chunk 都已加载时才验证
+            if (cx == chunkX && cz == chunkZ) {
+                scheduleCheck(world.provider.getDimension(), controllerPos);
+            }
+        }
+    }
+
     private static void checkSurroundingControllers(World world, BlockPos changedPos) {
         ControllerIndex index = ControllerIndex.get(world);
         if (index == null) return;

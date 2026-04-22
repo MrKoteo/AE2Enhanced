@@ -90,19 +90,23 @@ public class MixinCraftingCPUCluster {
 
     @Inject(method = "executeCrafting", at = @At("HEAD"))
     private void batchProcessVirtualTasks(IEnergyGrid energy, CraftingGridCache cache, CallbackInfo ci) {
+        CraftingCPUCluster cpu = null;
+        List<ICraftingPatternDetails> toRemove = new ArrayList<>();
+        long remainingItemCount = 0;
+        int remainingOperations = 0;
+
         try {
             initReflection();
-            CraftingCPUCluster cpu = (CraftingCPUCluster) (Object) this;
+            cpu = (CraftingCPUCluster) (Object) this;
 
             @SuppressWarnings("unchecked")
             Map<ICraftingPatternDetails, Object> tasks = (Map<ICraftingPatternDetails, Object>) tasksField.get(cpu);
             if (tasks.isEmpty()) return;
 
-            long remainingItemCount = remItemCountField.getLong(cpu);
-            int remainingOperations = remOpsField.getInt(cpu);
+            remainingItemCount = remItemCountField.getLong(cpu);
+            remainingOperations = remOpsField.getInt(cpu);
             @SuppressWarnings("unchecked")
             IItemList<IAEItemStack> waitingFor = (IItemList<IAEItemStack>) waitingForField.get(cpu);
-            List<ICraftingPatternDetails> toRemove = new ArrayList<>();
 
             // 循环遍历直到没有更多 entry 能被 batch，处理套娃合成的链式依赖
             boolean changed;
@@ -117,8 +121,7 @@ public class MixinCraftingCPUCluster {
                     long remaining = taskProgressValueField.getLong(progress);
                     if (remaining <= 0) continue;
 
-                    // 跳过带有替代品的配方：AE2 原生 canCraft 对 canSubstitute 使用逐槽模糊匹配，
-                    // 而我们的 SIMULATE 使用 condensedInputs 总量精确匹配，可能不一致导致误判
+                    // 带有替代品的配方走原生路径，避免 SIMULATE 与模糊匹配不一致
                     if (details.canSubstitute()) continue;
 
                     List<ICraftingMedium> mediums = cache.getMediums(details);
@@ -214,20 +217,29 @@ public class MixinCraftingCPUCluster {
                     }
                 }
             } while (changed);
-
-            for (ICraftingPatternDetails key : toRemove) {
-                tasks.remove(key);
-            }
-
-            if (remainingItemCount != remItemCountField.getLong(cpu)) {
-                remItemCountField.setLong(cpu, remainingItemCount);
-            }
-            if (remainingOperations != remOpsField.getInt(cpu)) {
-                remOpsField.setInt(cpu, remainingOperations);
-            }
         } catch (Exception e) {
             System.err.println("[AE2E] batchProcessVirtualTasks error: " + e);
             e.printStackTrace();
+        } finally {
+            // 确保即使 do-while 中发生异常，已标记的 entry 仍被移除，防止无限残留
+            if (cpu != null && !toRemove.isEmpty()) {
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<ICraftingPatternDetails, Object> tasks = (Map<ICraftingPatternDetails, Object>) tasksField.get(cpu);
+                    for (ICraftingPatternDetails key : toRemove) {
+                        tasks.remove(key);
+                    }
+                    if (remainingItemCount != remItemCountField.getLong(cpu)) {
+                        remItemCountField.setLong(cpu, remainingItemCount);
+                    }
+                    if (remainingOperations != remOpsField.getInt(cpu)) {
+                        remOpsField.setInt(cpu, remainingOperations);
+                    }
+                } catch (Exception ex) {
+                    System.err.println("[AE2E] batchProcessVirtualTasks finally error: " + ex);
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 }
