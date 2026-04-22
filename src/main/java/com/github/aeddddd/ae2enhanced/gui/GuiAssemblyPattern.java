@@ -32,8 +32,8 @@ public class GuiAssemblyPattern extends GuiContainer {
     public GuiAssemblyPattern(InventoryPlayer playerInv, TileAssemblyController tile) {
         super(new ContainerAssemblyPattern(playerInv, tile));
         this.tile = tile;
-        this.xSize = 280;
-        this.ySize = 270;
+        this.xSize = 340;
+        this.ySize = 250;
     }
 
     @Override
@@ -51,8 +51,8 @@ public class GuiAssemblyPattern extends GuiContainer {
         // 主背景
         drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + ySize, PANEL_BG);
 
-        // 内面板区域
-        drawRect(guiLeft + 10, guiTop + 26, guiLeft + xSize - 10, guiTop + 170, PANEL_LIGHT);
+        // 内面板区域（样板槽区域）
+        drawRect(guiLeft + 8, guiTop + 22, guiLeft + xSize - 8, guiTop + 146, PANEL_LIGHT);
 
         // 顶部高亮条
         drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + 2, ACCENT);
@@ -75,8 +75,8 @@ public class GuiAssemblyPattern extends GuiContainer {
         drawRect(guiLeft + xSize - 2, guiTop + ySize - corner, guiLeft + xSize, guiTop + ySize, ACCENT);
 
         // 内面板边框
-        drawRect(guiLeft + 10, guiTop + 26, guiLeft + xSize - 10, guiTop + 27, BORDER_DIM);
-        drawRect(guiLeft + 10, guiTop + 169, guiLeft + xSize - 10, guiTop + 170, BORDER_DIM);
+        drawRect(guiLeft + 8, guiTop + 22, guiLeft + xSize - 8, guiTop + 23, BORDER_DIM);
+        drawRect(guiLeft + 8, guiTop + 145, guiLeft + xSize - 8, guiTop + 146, BORDER_DIM);
 
         // 绘制所有 slot 边框
         drawSlotBorders(mouseX, mouseY);
@@ -107,13 +107,13 @@ public class GuiAssemblyPattern extends GuiContainer {
 
         // 样板槽标签
         String patternLabel = I18n.format("gui.ae2enhanced.formed.patterns");
-        fontRenderer.drawString(patternLabel, 16, 28, TEXT_DIM);
+        fontRenderer.drawString(patternLabel, 16, 24, TEXT_DIM);
 
         // 分隔线
         drawRect(16, 40, xSize - 16, 41, ACCENT_SOFT);
 
         // 背包上方分隔线
-        drawRect(16, 176, xSize - 16, 177, ACCENT_SOFT);
+        drawRect(16, 148, xSize - 16, 149, ACCENT_SOFT);
     }
 
     @Override
@@ -133,7 +133,7 @@ public class GuiAssemblyPattern extends GuiContainer {
     }
 
     private void drawCustomTooltips(int mouseX, int mouseY) {
-        if (isPointInRegion(16, 24, 118, 118, mouseX, mouseY)) {
+        if (isPointInRegion(8, 22, 324, 124, mouseX, mouseY)) {
             List<String> lines = new ArrayList<>();
             lines.add(I18n.format("gui.ae2enhanced.tooltip.patterns"));
             lines.add("§7" + I18n.format("gui.ae2enhanced.tooltip.patterns.desc") + "§r");

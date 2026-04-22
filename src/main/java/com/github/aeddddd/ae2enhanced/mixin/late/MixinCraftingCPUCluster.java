@@ -128,6 +128,7 @@ public class MixinCraftingCPUCluster {
 
             // 循环遍历直到没有更多 entry 能被 batch，处理套娃合成的链式依赖
             boolean changed;
+            int doWhileIterations = 0;
             do {
                 changed = false;
                 for (Map.Entry<ICraftingPatternDetails, Object> entry : new ArrayList<>(tasks.entrySet())) {
@@ -151,7 +152,14 @@ public class MixinCraftingCPUCluster {
 
                         TileAssemblyController controller = ((TileAssemblyMeInterface) medium).getController();
                         if (controller == null || !controller.isVirtualPattern(details)) continue;
+
+                        // 速度升级冷却检查：冷却未结束则跳过，留给原生路径或下次 tick
+                        if (!controller.canBatch()) continue;
                         virtualTasksFound++;
+
+                        // 并行度限制：无限制时一次性处理全部，有限制时每批最多 cap 个
+                        long cap = controller.getParallelCap();
+                        long batchSize = (cap >= Long.MAX_VALUE / 2) ? remaining : Math.min(remaining, cap);
 
                         appeng.api.networking.security.IActionSource source = cpu.getActionSource();
                         controller.setCurrentActionSource(source);
@@ -166,7 +174,7 @@ public class MixinCraftingCPUCluster {
                             boolean canExtract = true;
                             for (IAEItemStack inputTemplate : details.getCondensedInputs()) {
                                 if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
-                                long totalNeed = inputTemplate.getStackSize() * remaining;
+                                long totalNeed = inputTemplate.getStackSize() * batchSize;
                                 if (totalNeed <= 0) { canExtract = false; break; }
                                 IAEItemStack need = inputTemplate.copy();
                                 need.setStackSize(totalNeed);
@@ -183,7 +191,7 @@ public class MixinCraftingCPUCluster {
                             // 2. MODULATE 扣除原料并通知监听器
                             for (IAEItemStack inputTemplate : details.getCondensedInputs()) {
                                 if (inputTemplate == null || inputTemplate.getStackSize() <= 0) continue;
-                                long totalNeed = inputTemplate.getStackSize() * remaining;
+                                long totalNeed = inputTemplate.getStackSize() * batchSize;
                                 IAEItemStack need = inputTemplate.copy();
                                 need.setStackSize(totalNeed);
                                 IAEItemStack extracted = meInv.extractItems(need, MODULATE, source);
@@ -199,7 +207,7 @@ public class MixinCraftingCPUCluster {
                             long totalOutputItems = 0;
                             for (IAEItemStack outputTemplate : details.getCondensedOutputs()) {
                                 if (outputTemplate == null || outputTemplate.getStackSize() <= 0) continue;
-                                long totalCount = outputTemplate.getStackSize() * remaining;
+                                long totalCount = outputTemplate.getStackSize() * batchSize;
                                 if (totalCount <= 0) continue;
                                 totalOutputItems += totalCount;
 
@@ -221,22 +229,29 @@ public class MixinCraftingCPUCluster {
                                 }
                             }
 
-                            // 4. 移除 entry 并同步计数器
-                            toRemove.add(details);
+                            // 4. 更新或移除 entry，同步计数器
+                            if (batchSize >= remaining) {
+                                toRemove.add(details);
+                            } else {
+                                taskProgressValueField.setLong(progress, remaining - batchSize);
+                            }
                             remainingItemCount -= totalOutputItems;
-                            int ops = (int) Math.min(remaining, Integer.MAX_VALUE);
+                            int ops = (int) Math.min(batchSize, Integer.MAX_VALUE);
                             if (remainingOperations > 0) {
                                 remainingOperations = Math.max(0, remainingOperations - ops);
                             }
                             changed = true;
                             virtualTasksExecuted++;
+                            // batch 成功执行后重置冷却（由速度升级决定冷却时长）
+                            controller.resetBatchCooldown();
                         } finally {
                             controller.setCurrentActionSource(null);
                         }
                         break;
                     }
                 }
-            } while (changed);
+                doWhileIterations++;
+            } while (changed && doWhileIterations < 1000);
         } catch (Exception e) {
             AE2Enhanced.LOGGER.error("[AE2E] batchProcessVirtualTasks unexpected error: {}", e.toString());
         } finally {

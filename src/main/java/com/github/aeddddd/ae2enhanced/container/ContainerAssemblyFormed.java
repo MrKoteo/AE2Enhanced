@@ -42,6 +42,11 @@ public class ContainerAssemblyFormed extends Container {
                     public int getItemStackLimit(ItemStack stack) {
                         return ItemUpgradeCard.getMaxStackForMeta(index);
                     }
+
+                    @Override
+                    public int getSlotStackLimit() {
+                        return ItemUpgradeCard.getMaxStackForMeta(index);
+                    }
                 });
             }
         }

@@ -40,7 +40,7 @@ import java.util.*;
 public class TileAssemblyController extends TileEntity implements ICraftingProvider, ITickable {
 
     public static final int UPGRADE_SLOTS = 6;
-    public static final int PATTERN_SLOTS = 36;
+    public static final int PATTERN_SLOTS = 96;
     public static final int TOTAL_SLOTS = UPGRADE_SLOTS + PATTERN_SLOTS;
 
     private static final IActionSource MACHINE_SOURCE = new IActionSource() {
@@ -54,6 +54,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     private BlockPos activeMeInterfacePos = null;
     private boolean networkActive = false;
     private boolean networkPowered = false;
+    private int batchCooldown = 0;
 
     private final ItemStackHandler itemHandler = new ItemStackHandler(TOTAL_SLOTS) {
         @Override
@@ -205,6 +206,11 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         // 注入待输出物品（批量）
         if (!pendingOutputs.isEmpty()) {
             tryInjectPendingOutputs();
+        }
+
+        // 递减 batch 冷却
+        if (batchCooldown > 0) {
+            batchCooldown--;
         }
 
         // 递减所有 job timer
@@ -417,7 +423,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
      * 获取当前合成延迟 tick 数。速度升级卡固定在槽位 1，堆叠数量即为安装数量。
      * 每张减半，最低 1 tick。
      */
-    private int getCraftingTicks() {
+    public int getCraftingTicks() {
         int ticks = 20;
         ItemStack stack = itemHandler.getStackInSlot(1);
         if (!stack.isEmpty() && stack.getItem() instanceof ItemUpgradeCard && stack.getMetadata() == ItemUpgradeCard.META_SPEED) {
@@ -426,6 +432,20 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             }
         }
         return ticks;
+    }
+
+    /**
+     * 供 Mixin 调用：检查当前 batch 冷却是否已结束。
+     */
+    public boolean canBatch() {
+        return batchCooldown <= 0;
+    }
+
+    /**
+     * 供 Mixin 调用：batch 执行成功后重置冷却。
+     */
+    public void resetBatchCooldown() {
+        this.batchCooldown = getCraftingTicks();
     }
 
     @Override
@@ -582,7 +602,15 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             );
         }
         if (compound.hasKey("items")) {
-            itemHandler.deserializeNBT(compound.getCompoundTag("items"));
+            NBTTagCompound itemsTag = compound.getCompoundTag("items");
+            // 旧存档 Size 可能小于当前 TOTAL_SLOTS（从 42 升级到 102），需扩展避免越界
+            if (itemsTag.hasKey("Size", Constants.NBT.TAG_INT)) {
+                int oldSize = itemsTag.getInteger("Size");
+                if (oldSize < TOTAL_SLOTS) {
+                    itemsTag.setInteger("Size", TOTAL_SLOTS);
+                }
+            }
+            itemHandler.deserializeNBT(itemsTag);
         }
         if (compound.hasKey("pendingOutputs")) {
             pendingOutputs.clear();
