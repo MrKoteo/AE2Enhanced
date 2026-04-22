@@ -59,6 +59,10 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         @Override
         protected void onContentsChanged(int slot) {
             markDirty();
+            // 强制同步到客户端，修复'取出升级后重新打开 GUI 发现升级还在原位'的同步延迟问题
+            if (world != null && !world.isRemote) {
+                world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
+            }
             if (slot >= UPGRADE_SLOTS && world != null && !world.isRemote) {
                 patternsDirty = true;
             }
@@ -176,10 +180,10 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     public void update() {
         if (world == null || world.isRemote) return;
 
-        // 样板变化时触发 AE 网络重新扫描
+        // 样板变化时触发 AE 网络重新扫描，1 tick 延迟合并同一 tick 内的连续变化
         if (patternsDirty && activeMeInterfacePos != null) {
             patternsDirty = false;
-            patternRefreshTicks = 5;
+            patternRefreshTicks = 1;
         }
         if (patternRefreshTicks > 0 && activeMeInterfacePos != null) {
             if (--patternRefreshTicks == 0) {
