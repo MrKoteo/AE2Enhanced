@@ -11,6 +11,8 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 @Mod(
     modid = AE2Enhanced.MOD_ID,
@@ -33,6 +35,7 @@ public class AE2Enhanced {
     @SidedProxy(clientSide = CLIENT_PROXY, serverSide = SERVER_PROXY)
     public static CommonProxy proxy;
 
+    public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
     public static SimpleNetworkWrapper network;
 
     @Mod.EventHandler

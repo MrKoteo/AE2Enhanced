@@ -539,6 +539,15 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     // ---------- NBT ----------
 
     @Override
+    public void onLoad() {
+        // 强制同步 formed 状态到客户端，避免加载后客户端 formed 仍为默认值 false，
+        // 导致容器槽位数量不一致（服务端 78 槽 vs 客户端 36 槽），引发槽位索引映射错误
+        if (world != null && !world.isRemote) {
+            world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
+        }
+    }
+
+    @Override
     public void readFromNBT(NBTTagCompound compound) {
         super.readFromNBT(compound);
         this.formed = compound.getBoolean("formed");
@@ -567,6 +576,19 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
                     stack.setTagCompound(tag.getCompoundTag("tag"));
                 }
                 pendingOutputs.add(stack);
+            }
+        }
+        // 存档加载后立即预填充虚拟缓存，避免 AE2 网络扫描前下单时缓存为空
+        if (world != null && !world.isRemote) {
+            for (int i = UPGRADE_SLOTS; i < TOTAL_SLOTS; i++) {
+                ItemStack stack = itemHandler.getStackInSlot(i);
+                if (stack.isEmpty()) continue;
+                if (stack.getItem() instanceof ICraftingPatternItem) {
+                    ICraftingPatternDetails pattern = ((ICraftingPatternItem) stack.getItem()).getPatternForItem(stack, world);
+                    if (pattern != null && pattern.isCraftable()) {
+                        prefillVirtualCache(pattern);
+                    }
+                }
             }
         }
     }
@@ -601,41 +623,17 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
     @Override
     public NBTTagCompound getUpdateTag() {
-        // 仅同步客户端渲染/GUI 所需的字段，避免 pendingOutputs 造成网络包膨胀
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setBoolean("formed", formed);
-        tag.setBoolean("networkActive", networkActive);
-        tag.setBoolean("networkPowered", networkPowered);
-        if (activeMeInterfacePos != null) {
-            tag.setInteger("activeMeX", activeMeInterfacePos.getX());
-            tag.setInteger("activeMeY", activeMeInterfacePos.getY());
-            tag.setInteger("activeMeZ", activeMeInterfacePos.getZ());
-        }
-        tag.setTag("items", itemHandler.serializeNBT());
+        // 使用 writeToNBT 保证字段完整，再移除 pendingOutputs 避免网络包膨胀。
+        // b6f8b78 之前直接用 writeToNBT 没有问题；改为手动构造后导致某些字段
+        // 在客户端初始化时不同步，进而引发容器槽位错位。
+        NBTTagCompound tag = writeToNBT(new NBTTagCompound());
+        tag.removeTag("pendingOutputs");
         return tag;
     }
 
     @Override
     public void handleUpdateTag(NBTTagCompound tag) {
-        boolean oldFormed = this.formed;
-        this.formed = tag.getBoolean("formed");
-        this.networkActive = tag.getBoolean("networkActive");
-        this.networkPowered = tag.getBoolean("networkPowered");
-        if (tag.hasKey("activeMeX")) {
-            activeMeInterfacePos = new BlockPos(
-                tag.getInteger("activeMeX"),
-                tag.getInteger("activeMeY"),
-                tag.getInteger("activeMeZ")
-            );
-        } else {
-            activeMeInterfacePos = null;
-        }
-        if (tag.hasKey("items")) {
-            itemHandler.deserializeNBT(tag.getCompoundTag("items"));
-        }
-        if (oldFormed != this.formed && world != null) {
-            world.markBlockRangeForRenderUpdate(pos, pos);
-        }
+        readFromNBT(tag);
     }
 
     @Override
@@ -645,6 +643,6 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
     @Override
     public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity pkt) {
-        handleUpdateTag(pkt.getNbtCompound());
+        readFromNBT(pkt.getNbtCompound());
     }
 }
