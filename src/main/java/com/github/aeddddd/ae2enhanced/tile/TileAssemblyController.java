@@ -671,9 +671,22 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
     @Override
     public void onLoad() {
-        // 强制同步 formed 状态到客户端，避免加载后客户端 formed 仍为默认值 false，
-        // 导致容器槽位数量不一致（服务端 78 槽 vs 客户端 36 槽），引发槽位索引映射错误
         if (world != null && !world.isRemote) {
+            // readFromNBT 时 world 通常为 null，patternVirtualCache 未被预填充。
+            // 此处补全缓存，确保 AE2 网络扫描前缓存已就绪。
+            int patternSlots = getPatternSlotCount();
+            for (int i = UPGRADE_SLOTS; i < UPGRADE_SLOTS + patternSlots; i++) {
+                ItemStack stack = itemHandler.getStackInSlot(i);
+                if (stack.isEmpty()) continue;
+                if (stack.getItem() instanceof ICraftingPatternItem) {
+                    ICraftingPatternDetails pattern = ((ICraftingPatternItem) stack.getItem()).getPatternForItem(stack, world);
+                    if (pattern != null && pattern.isCraftable()) {
+                        prefillVirtualCache(pattern);
+                    }
+                }
+            }
+            // 强制同步 formed 状态到客户端，避免加载后客户端 formed 仍为默认值 false，
+            // 导致容器槽位数量不一致（服务端 78 槽 vs 客户端 36 槽），引发槽位索引映射错误
             world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
         }
     }

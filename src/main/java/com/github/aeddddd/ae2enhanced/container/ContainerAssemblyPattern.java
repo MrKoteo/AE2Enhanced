@@ -20,22 +20,22 @@ public class ContainerAssemblyPattern extends Container {
 
     private final TileAssemblyController tile;
     private final int page;
+    private final int patternSlotCount;
 
     public ContainerAssemblyPattern(IInventory playerInv, TileAssemblyController tile, int page) {
         this.tile = tile;
-        // 页码边界保护
-        int maxPage = tile.getPatternPages() - 1;
-        if (page < 0) page = 0;
-        if (page > maxPage) page = maxPage;
         this.page = page;
         IItemHandler handler = tile.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null);
 
         int startSlot = TileAssemblyController.UPGRADE_SLOTS
             + page * TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
+        // 用 handler.getSlots() 做硬边界，避免客户端 itemHandler 尚未扩展时越界
         int endSlot = Math.min(startSlot + TileAssemblyController.PATTERN_SLOTS_PER_PAGE,
-            TileAssemblyController.UPGRADE_SLOTS + tile.getPatternSlotCount());
+            handler.getSlots());
 
-        // 样板槽：当前页 16×6=96 槽
+        this.patternSlotCount = endSlot - startSlot;
+
+        // 样板槽：当前页 16×6=96 槽（实际受 handler.getSlots() 限制）
         for (int i = startSlot; i < endSlot; i++) {
             int localIndex = i - startSlot;
             int row = localIndex / 16;
@@ -83,7 +83,7 @@ public class ContainerAssemblyPattern extends Container {
             ItemStack itemstack1 = slot.getStack();
             itemstack = itemstack1.copy();
 
-            int patternEnd = TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
+            int patternEnd = this.patternSlotCount;
             int playerStart = patternEnd;
             int playerEnd = playerStart + 36;
 
