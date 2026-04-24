@@ -2,6 +2,7 @@ package com.github.aeddddd.ae2enhanced.gui;
 
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyFormed;
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.network.PacketPatternPage;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.inventory.GuiContainer;
@@ -113,8 +114,8 @@ public class GuiAssemblyFormed extends GuiContainer {
     @Override
     protected void actionPerformed(GuiButton button) throws IOException {
         if (button.id == 0) {
-            mc.player.openGui(AE2Enhanced.instance, GuiHandler.encodePatternId(0, tile.getPatternPages()),
-                mc.world, tile.getPos().getX(), tile.getPos().getY(), tile.getPos().getZ());
+            // 通过 PacketPatternPage 让服务端打开样板 GUI，确保第一次打开与翻页使用完全相同的代码路径
+            AE2Enhanced.network.sendToServer(new PacketPatternPage(tile.getPos(), 0));
         }
     }
 
