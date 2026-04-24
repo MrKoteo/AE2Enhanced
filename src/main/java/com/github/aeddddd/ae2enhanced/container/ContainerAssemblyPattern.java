@@ -24,16 +24,18 @@ public class ContainerAssemblyPattern extends Container {
     private final int page;
     private final int patternSlotCount;
 
-    public ContainerAssemblyPattern(IInventory playerInv, TileAssemblyController tile, int page) {
+    public ContainerAssemblyPattern(IInventory playerInv, TileAssemblyController tile, int page, int patternPages) {
         this.tile = tile;
         this.page = page;
         IItemHandler handler = tile.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null);
 
         int startSlot = TileAssemblyController.UPGRADE_SLOTS
             + page * TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
-        // 用 handler.getSlots() 做硬边界，避免客户端 itemHandler 尚未扩展时越界
+        // 使用服务端同步的 patternPages 计算边界，避免客户端 handler.getSlots() 未同步导致槽位映射错误
+        int expectedTotalSlots = TileAssemblyController.UPGRADE_SLOTS
+            + patternPages * TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
         int endSlot = Math.min(startSlot + TileAssemblyController.PATTERN_SLOTS_PER_PAGE,
-            handler.getSlots());
+            expectedTotalSlots);
 
         this.patternSlotCount = endSlot - startSlot;
 
@@ -61,10 +63,20 @@ public class ContainerAssemblyPattern extends Container {
                  * 默认实现忽略返回值，导致 Container.mergeItemStack 认为物品已放入，
                  * 但实际上传入的 stack 引用未被消耗，源槽位（背包）不会被清空，
                  * 出现"样板还在背包中"的同步异常。
+                 *
+                 * 注意：必须先复制 stack 再调用 insertItem，因为 Forge 的 ItemStackHandler
+                 * 在成功时可能直接将传入的 stack 引用存入内部列表。如果随后修改该 stack
+                 * 的 count，会同时污染 itemHandler 中的数据，导致物品消失。
                  */
                 @Override
                 public void putStack(@Nonnull ItemStack stack) {
-                    ItemStack remainder = handlerRef.insertItem(handlerIndex, stack, false);
+                    if (stack.isEmpty()) {
+                        handlerRef.extractItem(handlerIndex, Integer.MAX_VALUE, false);
+                        this.onSlotChanged();
+                        return;
+                    }
+                    ItemStack toInsert = stack.copy();
+                    ItemStack remainder = handlerRef.insertItem(handlerIndex, toInsert, false);
                     if (remainder.isEmpty()) {
                         stack.setCount(0);
                     } else {

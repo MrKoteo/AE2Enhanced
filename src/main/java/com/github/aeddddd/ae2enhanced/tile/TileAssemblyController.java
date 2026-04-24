@@ -97,6 +97,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         @Override
         @Nonnull
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            if (slot < 0 || slot >= stacks.size()) return ItemStack.EMPTY;
             if (slot == ItemUpgradeCard.META_CAPACITY && !simulate) {
                 ItemStack current = getStackInSlot(slot);
                 int newCount = Math.max(0, current.getCount() - amount);
@@ -114,6 +115,27 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
                 newStacks.set(i, stacks.get(i));
             }
             stacks = newStacks;
+        }
+
+        /** 越界保护：客户端 itemHandler 容量可能尚未同步，避免 ArrayIndexOutOfBoundsException */
+        @Override
+        @Nonnull
+        public ItemStack getStackInSlot(int slot) {
+            if (slot < 0 || slot >= stacks.size()) return ItemStack.EMPTY;
+            return super.getStackInSlot(slot);
+        }
+
+        @Override
+        @Nonnull
+        public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
+            if (slot < 0 || slot >= stacks.size()) return stack;
+            return super.insertItem(slot, stack, simulate);
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            if (slot < 0 || slot >= stacks.size()) return 0;
+            return super.getSlotLimit(slot);
         }
     }
 

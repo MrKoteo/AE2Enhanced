@@ -15,14 +15,19 @@ public class GuiHandler implements IGuiHandler {
     public static final int GUI_ASSEMBLY_CONTROLLER = 0;
     public static final int GUI_ASSEMBLY_PATTERN = 1;
 
-    /** 编码页码到 GUI ID：低4位为 base ID，高位为页码（8位，支持0~255页） */
-    public static int encodePatternId(int page) {
-        return GUI_ASSEMBLY_PATTERN | (page << 8);
+    /** 编码页码到 GUI ID：低4位为 base ID，bit8-15为页码，bit16-20为 patternPages */
+    public static int encodePatternId(int page, int patternPages) {
+        return GUI_ASSEMBLY_PATTERN | (page << 8) | (patternPages << 16);
     }
 
     /** 从 GUI ID 解码页码 */
     public static int decodePatternPage(int ID) {
         return (ID >> 8) & 0xFF;
+    }
+
+    /** 从 GUI ID 解码 patternPages */
+    public static int decodePatternPages(int ID) {
+        return (ID >> 16) & 0x1F;
     }
 
     @Override
@@ -39,7 +44,8 @@ public class GuiHandler implements IGuiHandler {
             }
         } else if (baseId == GUI_ASSEMBLY_PATTERN) {
             int page = decodePatternPage(ID);
-            return new ContainerAssemblyPattern(player.inventory, tile, page);
+            int patternPages = decodePatternPages(ID);
+            return new ContainerAssemblyPattern(player.inventory, tile, page, patternPages);
         }
         return null;
     }
@@ -58,7 +64,8 @@ public class GuiHandler implements IGuiHandler {
             }
         } else if (baseId == GUI_ASSEMBLY_PATTERN) {
             int page = decodePatternPage(ID);
-            return new GuiAssemblyPattern(player.inventory, tile, page);
+            int patternPages = decodePatternPages(ID);
+            return new GuiAssemblyPattern(player.inventory, tile, page, patternPages);
         }
         return null;
     }

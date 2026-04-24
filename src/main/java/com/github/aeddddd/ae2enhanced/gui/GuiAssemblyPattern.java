@@ -30,8 +30,8 @@ public class GuiAssemblyPattern extends GuiContainer {
     private GuiButtonTech prevButton;
     private GuiButtonTech nextButton;
 
-    public GuiAssemblyPattern(InventoryPlayer playerInv, TileAssemblyController tile, int page) {
-        super(new ContainerAssemblyPattern(playerInv, tile, page));
+    public GuiAssemblyPattern(InventoryPlayer playerInv, TileAssemblyController tile, int page, int patternPages) {
+        super(new ContainerAssemblyPattern(playerInv, tile, page, patternPages));
         this.xSize = 350;
         this.ySize = 234;
         this.tile = tile;
@@ -131,7 +131,7 @@ public class GuiAssemblyPattern extends GuiContainer {
 
         int maxPage = tile.getPatternPages() - 1;
         if (page > maxPage && maxPage >= 0) {
-            mc.player.openGui(AE2Enhanced.instance, GuiHandler.encodePatternId(maxPage),
+            mc.player.openGui(AE2Enhanced.instance, GuiHandler.encodePatternId(maxPage, tile.getPatternPages()),
                 mc.world, tile.getPos().getX(), tile.getPos().getY(), tile.getPos().getZ());
             return;
         }

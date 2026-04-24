@@ -11,10 +11,12 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class GuiAssemblyUnformed extends GuiContainer {
@@ -62,6 +64,35 @@ public class GuiAssemblyUnformed extends GuiContainer {
         return I18n.format("gui.ae2enhanced.assemble.survival");
     }
 
+    /**
+     * 检查玩家背包是否有足够材料组装缺失的方块。
+     * 客户端计算，用于生存模式下启用/禁用组装按钮。
+     */
+    private boolean hasEnoughMaterials() {
+        if (missingMap.isEmpty()) return true;
+        Map<Block, Integer> needed = new LinkedHashMap<>(missingMap);
+        for (ItemStack stack : mc.player.inventory.mainInventory) {
+            if (stack.isEmpty()) continue;
+            for (Map.Entry<Block, Integer> entry : needed.entrySet()) {
+                Block block = entry.getKey();
+                if (stack.getItem() == Item.getItemFromBlock(block)) {
+                    int need = entry.getValue();
+                    int have = stack.getCount();
+                    if (have >= need) {
+                        entry.setValue(0);
+                    } else {
+                        entry.setValue(need - have);
+                    }
+                    break;
+                }
+            }
+        }
+        for (int count : needed.values()) {
+            if (count > 0) return false;
+        }
+        return true;
+    }
+
     private void updateButtonState() {
         if (missingMap.isEmpty()) {
             assembleButton.enabled = true;
@@ -70,8 +101,11 @@ public class GuiAssemblyUnformed extends GuiContainer {
             if (mc.player.isCreative()) {
                 assembleButton.enabled = true;
             } else {
-                assembleButton.enabled = false;
-                assembleButton.displayString = I18n.format("gui.ae2enhanced.assemble.insufficient");
+                boolean hasMaterials = hasEnoughMaterials();
+                assembleButton.enabled = hasMaterials;
+                assembleButton.displayString = hasMaterials
+                        ? getAssembleButtonText()
+                        : I18n.format("gui.ae2enhanced.assemble.insufficient");
             }
         }
     }

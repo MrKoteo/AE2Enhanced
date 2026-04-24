@@ -113,7 +113,7 @@ public class GuiAssemblyFormed extends GuiContainer {
     @Override
     protected void actionPerformed(GuiButton button) throws IOException {
         if (button.id == 0) {
-            mc.player.openGui(AE2Enhanced.instance, GuiHandler.GUI_ASSEMBLY_PATTERN,
+            mc.player.openGui(AE2Enhanced.instance, GuiHandler.encodePatternId(0, tile.getPatternPages()),
                 mc.world, tile.getPos().getX(), tile.getPos().getY(), tile.getPos().getZ());
         }
     }

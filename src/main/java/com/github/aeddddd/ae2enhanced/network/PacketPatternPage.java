@@ -55,7 +55,7 @@ public class PacketPatternPage implements IMessage {
                 int maxPage = tile.getPatternPages() - 1;
                 if (page < 0) page = 0;
                 if (page > maxPage) page = maxPage;
-                int guiId = GuiHandler.encodePatternId(page);
+                int guiId = GuiHandler.encodePatternId(page, tile.getPatternPages());
                 player.openGui(AE2Enhanced.instance, guiId, world, pos.getX(), pos.getY(), pos.getZ());
             });
             return null;
