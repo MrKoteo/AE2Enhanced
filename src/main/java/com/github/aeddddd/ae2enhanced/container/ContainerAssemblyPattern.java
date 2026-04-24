@@ -88,6 +88,13 @@ public class ContainerAssemblyPattern extends Container {
                 }
 
                 @Override
+                public void onSlotChanged() {
+                    // 不调用 super.onSlotChanged()，因为 inventory 为 null 会导致 NPE。
+                    // itemHandler.setStackInSlot 内部已经调用了 onContentsChanged，
+                    // 足够触发 markDirty + notifyBlockUpdate。
+                }
+
+                @Override
                 public boolean canTakeStack(EntityPlayer playerIn) {
                     return true;
                 }
