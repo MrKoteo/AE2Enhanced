@@ -6,9 +6,10 @@ import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.NonNullList;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.SlotItemHandler;
+import net.minecraftforge.items.IItemHandlerModifiable;
 
 import javax.annotation.Nonnull;
 
@@ -31,7 +32,6 @@ public class ContainerAssemblyPattern extends Container {
 
         int startSlot = TileAssemblyController.UPGRADE_SLOTS
             + page * TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
-        // 使用服务端同步的 patternPages 计算边界，避免客户端 handler.getSlots() 未同步导致槽位映射错误
         int expectedTotalSlots = TileAssemblyController.UPGRADE_SLOTS
             + patternPages * TileAssemblyController.PATTERN_SLOTS_PER_PAGE;
         int endSlot = Math.min(startSlot + TileAssemblyController.PATTERN_SLOTS_PER_PAGE,
@@ -39,66 +39,13 @@ public class ContainerAssemblyPattern extends Container {
 
         this.patternSlotCount = endSlot - startSlot;
 
-        // 样板槽：当前页 16×6=96 槽
-        // 使用自定义 Slot 而非 SlotItemHandler，完全控制 getStack/putStack/isItemValid。
-        // SlotItemHandler 的 putStack 基于 insertItem（"合并"语义），会导致：
-        // (1) Container.setAll 同步时 count 异常累加；
-        // (2) mergeItemStack 第一阶段直接修改 getStack() 返回的引用，与 insertItem 冲突。
-        for (int i = startSlot; i < endSlot; i++) {
-            int localIndex = i - startSlot;
-            int row = localIndex / 16;
-            int col = localIndex % 16;
-            final int handlerIndex = i;
-            final IItemHandler handlerRef = handler;
-            this.addSlotToContainer(new Slot(null, localIndex,
-                PATTERN_X + col * 20, PATTERN_Y + row * 20) {
-                @Override
-                public ItemStack getStack() {
-                    return handlerRef.getStackInSlot(handlerIndex);
-                }
-
-                @Override
-                public void putStack(@Nonnull ItemStack stack) {
-                    if (handlerRef instanceof net.minecraftforge.items.IItemHandlerModifiable) {
-                        ((net.minecraftforge.items.IItemHandlerModifiable) handlerRef)
-                                .setStackInSlot(handlerIndex, stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
-                    } else {
-                        handlerRef.extractItem(handlerIndex, Integer.MAX_VALUE, false);
-                        if (!stack.isEmpty()) {
-                            handlerRef.insertItem(handlerIndex, stack.copy(), false);
-                        }
-                    }
-                    stack.setCount(0);
-                    this.onSlotChanged();
-                }
-
-                @Override
-                public boolean isItemValid(@Nonnull ItemStack stack) {
-                    return handlerRef.isItemValid(handlerIndex, stack);
-                }
-
-                @Override
-                public int getSlotStackLimit() {
-                    return 1;
-                }
-
-                @Override
-                public int getItemStackLimit(@Nonnull ItemStack stack) {
-                    return 1;
-                }
-
-                @Override
-                public void onSlotChanged() {
-                    // 不调用 super.onSlotChanged()，因为 inventory 为 null 会导致 NPE。
-                    // itemHandler.setStackInSlot 内部已经调用了 onContentsChanged，
-                    // 足够触发 markDirty + notifyBlockUpdate。
-                }
-
-                @Override
-                public boolean canTakeStack(EntityPlayer playerIn) {
-                    return true;
-                }
-            });
+        // 使用 PatternInventory 代理 IItemHandler，让原版 Slot 正常工作
+        PatternInventory patternInv = new PatternInventory(handler, startSlot, this.patternSlotCount);
+        for (int i = 0; i < this.patternSlotCount; i++) {
+            int row = i / 16;
+            int col = i % 16;
+            this.addSlotToContainer(new Slot(patternInv, i,
+                PATTERN_X + col * 20, PATTERN_Y + row * 20));
         }
 
         // 玩家背包 3行×9列
@@ -161,5 +108,142 @@ public class ContainerAssemblyPattern extends Container {
 
     public int getPage() {
         return page;
+    }
+
+    /**
+     * 将 IItemHandler 的指定槽位区间代理为 IInventory，供原版 Slot 使用。
+     * 避免使用 null inventory 导致 Slot 默认方法（decrStackSize 等）NPE。
+     * setInventorySlotContents 使用 setStackInSlot 实现替换语义，避免 insertItem 的合并副作用。
+     */
+    private static class PatternInventory implements IInventory {
+
+        @Override
+        @Nonnull
+        public String getName() {
+            return "pattern_inventory";
+        }
+
+        @Override
+        public boolean hasCustomName() {
+            return false;
+        }
+
+        @Override
+        @Nonnull
+        public net.minecraft.util.text.ITextComponent getDisplayName() {
+            return new net.minecraft.util.text.TextComponentString(getName());
+        }
+        private final IItemHandler handler;
+        private final int startSlot;
+        private final int size;
+
+        PatternInventory(IItemHandler handler, int startSlot, int size) {
+            this.handler = handler;
+            this.startSlot = startSlot;
+            this.size = size;
+        }
+
+        private int toHandlerIndex(int index) {
+            return startSlot + index;
+        }
+
+        @Override
+        public int getSizeInventory() {
+            return size;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            for (int i = 0; i < size; i++) {
+                if (!getStackInSlot(i).isEmpty()) return false;
+            }
+            return true;
+        }
+
+        @Override
+        @Nonnull
+        public ItemStack getStackInSlot(int index) {
+            if (index < 0 || index >= size) return ItemStack.EMPTY;
+            return handler.getStackInSlot(toHandlerIndex(index));
+        }
+
+        @Override
+        @Nonnull
+        public ItemStack decrStackSize(int index, int count) {
+            if (index < 0 || index >= size) return ItemStack.EMPTY;
+            return handler.extractItem(toHandlerIndex(index), count, false);
+        }
+
+        @Override
+        @Nonnull
+        public ItemStack removeStackFromSlot(int index) {
+            if (index < 0 || index >= size) return ItemStack.EMPTY;
+            return handler.extractItem(toHandlerIndex(index), Integer.MAX_VALUE, false);
+        }
+
+        @Override
+        public void setInventorySlotContents(int index, @Nonnull ItemStack stack) {
+            if (index < 0 || index >= size) return;
+            int handlerIndex = toHandlerIndex(index);
+            if (handler instanceof IItemHandlerModifiable) {
+                ((IItemHandlerModifiable) handler).setStackInSlot(handlerIndex,
+                    stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
+            } else {
+                handler.extractItem(handlerIndex, Integer.MAX_VALUE, false);
+                if (!stack.isEmpty()) {
+                    handler.insertItem(handlerIndex, stack.copy(), false);
+                }
+            }
+        }
+
+        @Override
+        public int getInventoryStackLimit() {
+            return 1;
+        }
+
+        @Override
+        public void markDirty() {
+            // ItemStackHandler 内部已有 onContentsChanged 机制，此处无需额外操作
+        }
+
+        @Override
+        public boolean isUsableByPlayer(@Nonnull EntityPlayer player) {
+            return true;
+        }
+
+        @Override
+        public void openInventory(@Nonnull EntityPlayer player) {
+        }
+
+        @Override
+        public void closeInventory(@Nonnull EntityPlayer player) {
+        }
+
+        @Override
+        public boolean isItemValidForSlot(int index, @Nonnull ItemStack stack) {
+            if (index < 0 || index >= size) return false;
+            return handler.isItemValid(toHandlerIndex(index), stack);
+        }
+
+        @Override
+        public int getField(int id) {
+            return 0;
+        }
+
+        @Override
+        public void setField(int id, int value) {
+        }
+
+        @Override
+        public int getFieldCount() {
+            return 0;
+        }
+
+        @Override
+        public void clear() {
+            for (int i = 0; i < size; i++) {
+                setInventorySlotContents(i, ItemStack.EMPTY);
+            }
+        }
     }
 }
