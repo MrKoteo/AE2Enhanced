@@ -39,34 +39,24 @@ public class ContainerAssemblyPattern extends Container {
 
         this.patternSlotCount = endSlot - startSlot;
 
-        // 样板槽：当前页 16×6=96 槽（实际受 handler.getSlots() 限制）
+        // 样板槽：当前页 16×6=96 槽
+        // 使用自定义 Slot 而非 SlotItemHandler，完全控制 getStack/putStack/isItemValid。
+        // SlotItemHandler 的 putStack 基于 insertItem（"合并"语义），会导致：
+        // (1) Container.setAll 同步时 count 异常累加；
+        // (2) mergeItemStack 第一阶段直接修改 getStack() 返回的引用，与 insertItem 冲突。
         for (int i = startSlot; i < endSlot; i++) {
             int localIndex = i - startSlot;
             int row = localIndex / 16;
             int col = localIndex % 16;
             final int handlerIndex = i;
             final IItemHandler handlerRef = handler;
-            this.addSlotToContainer(new SlotItemHandler(handler, i,
+            this.addSlotToContainer(new Slot(null, localIndex,
                 PATTERN_X + col * 20, PATTERN_Y + row * 20) {
                 @Override
-                public int getItemStackLimit(ItemStack stack) {
-                    return 1;
+                public ItemStack getStack() {
+                    return handlerRef.getStackInSlot(handlerIndex);
                 }
 
-                @Override
-                public int getSlotStackLimit() {
-                    return 1;
-                }
-
-                /**
-                 * 覆盖 putStack，使用 setStackInSlot 直接替换槽位内容。
-                 * 默认 SlotItemHandler.putStack 使用 insertItem，其语义是"合并"而非"替换"，
-                 * 会导致 Container.setAll (SPacketWindowItems) 每次同步时都将新 stack grow
-                 * 到已有 stack 上，造成样板数量异常累加（如切页后返回时数量+2）。
-                 *
-                 * 使用 IItemHandlerModifiable.setStackInSlot 可直接设置槽位内容，避免合并语义。
-                 * PatternItemHandler 已对 setStackInSlot 添加越界保护，防止客户端容量未同步时崩溃。
-                 */
                 @Override
                 public void putStack(@Nonnull ItemStack stack) {
                     if (handlerRef instanceof net.minecraftforge.items.IItemHandlerModifiable) {
@@ -80,6 +70,26 @@ public class ContainerAssemblyPattern extends Container {
                     }
                     stack.setCount(0);
                     this.onSlotChanged();
+                }
+
+                @Override
+                public boolean isItemValid(@Nonnull ItemStack stack) {
+                    return handlerRef.isItemValid(handlerIndex, stack);
+                }
+
+                @Override
+                public int getSlotStackLimit() {
+                    return 1;
+                }
+
+                @Override
+                public int getItemStackLimit(@Nonnull ItemStack stack) {
+                    return 1;
+                }
+
+                @Override
+                public boolean canTakeStack(EntityPlayer playerIn) {
+                    return true;
                 }
             });
         }
