@@ -67,22 +67,22 @@ public class ItemUpgradeCard extends Item {
         switch (meta) {
             case META_PARALLEL:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip"));
-                lines = I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip.detail", max).split("\\n");
+                lines = I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip.detail", max).replace("\\n", "\n").split("\n");
                 for (String line : lines) tooltip.add(line);
                 break;
             case META_SPEED:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip"));
-                lines = I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip.detail", max).split("\\n");
+                lines = I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip.detail", max).replace("\\n", "\n").split("\n");
                 for (String line : lines) tooltip.add(line);
                 break;
             case META_EFFICIENCY:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip"));
-                lines = I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip.detail", max).split("\\n");
+                lines = I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip.detail", max).replace("\\n", "\n").split("\n");
                 for (String line : lines) tooltip.add(line);
                 break;
             case META_CAPACITY:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip"));
-                lines = I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip.detail", max).split("\\n");
+                lines = I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip.detail", max).replace("\\n", "\n").split("\n");
                 for (String line : lines) tooltip.add(line);
                 break;
             default:

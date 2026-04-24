@@ -46,12 +46,12 @@ gui.ae2enhanced.tooltip.upgrades.speed=• Overclock Processing Module: Reduces 
 gui.ae2enhanced.tooltip.patterns=§bPattern Storage
 gui.ae2enhanced.tooltip.patterns.desc=Insert encoded Crafting Patterns
 
-item.ae2enhanced.upgrade_card.parallel.name=Parallel Extension Module
-item.ae2enhanced.upgrade_card.parallel.tooltip=§b§lParallel Extension Module §r§8[Type: Parallel]
-item.ae2enhanced.upgrade_card.parallel.tooltip.detail=§7Increases the parallel processing limit for batch crafting.\n§7Thresholds: §e64 §8| §e2,048 §8| §e65,536 §8| §e2,097,152 §8| §e67,108,864 §8| §e∞\n§7Stack Limit: §b%d §7cards
-item.ae2enhanced.upgrade_card.speed.name=Overclock Processing Module
-item.ae2enhanced.upgrade_card.speed.tooltip=§b§lOverclock Processing Module §r§8[Type: Speed]
-item.ae2enhanced.upgrade_card.speed.tooltip.detail=§7Reduces batch crafting cooldown. Each tier reduces cooldown by 50%%.\n§7Max Cooldown: §e1 tick\n§7Stack Limit: §b%d §7cards
+item.ae2enhanced.upgrade_card.parallel.name=Temporal Fold Module
+item.ae2enhanced.upgrade_card.parallel.tooltip=§b§lTemporal Fold Module §r§8[Type: Parallel]
+item.ae2enhanced.upgrade_card.parallel.tooltip.detail=§7Folds immense crafting timelines into a single tick, raising the parallel processing limit for batch crafting.\n§7Thresholds: §e64 §8| §e2,048 §8| §e65,536 §8| §e2,097,152 §8| §e67,108,864 §8| §e∞\n§7Stack Limit: §b%d §7cards\n §b§l"This very moment is all of eternity"
+item.ae2enhanced.upgrade_card.speed.name=Spacetime Dilation Module
+item.ae2enhanced.upgrade_card.speed.tooltip=§b§lSpacetime Dilation Module §r§8[Type: Speed]
+item.ae2enhanced.upgrade_card.speed.tooltip.detail=§7Leverages relativistic effects of the contained singularity to reduce batch crafting cooldown. Each tier halves cooldown.\n§7Max Cooldown: §e1 tick\n§7Stack Limit: §b%d §7cards\n §b§l"One day spans all seasons"
 item.ae2enhanced.upgrade_card.efficiency.name=Energy Optimization Module
 item.ae2enhanced.upgrade_card.efficiency.tooltip=§b§lEnergy Optimization Module §r§8[Type: Efficiency]
 item.ae2enhanced.upgrade_card.efficiency.tooltip.detail=§7Reduces AE network power consumption of the Assembly Hub.\n§7Stack Limit: §b%d §7cards
@@ -61,3 +61,5 @@ item.ae2enhanced.upgrade_card.capacity.tooltip.detail=§7Expands pattern storage
 item.ae2enhanced.upgrade_card.reserved1.name=Extension Module (Reserved)
 item.ae2enhanced.upgrade_card.reserved2.name=Extension Module (Reserved)
 item.ae2enhanced.upgrade_card.reserved.tooltip=§7Reserved interface. Functionality not yet activated.
+
+death.spacetime.blackHole=%1$s was forever lost in the event horizon

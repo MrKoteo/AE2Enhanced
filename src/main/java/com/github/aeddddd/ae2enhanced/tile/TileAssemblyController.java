@@ -27,6 +27,7 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.DamageSource;
+
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.ITickable;
@@ -34,7 +35,9 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
+
+
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.items.CapabilityItemHandler;
@@ -370,14 +373,23 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
                 origin.getX() - 2, origin.getY() - 2, origin.getZ() - 2,
                 origin.getX() + 3, origin.getY() + 3, origin.getZ() + 3
             );
+            DamageSource spacetime = new DamageSource("spacetime") {
+                @Override
+                public ITextComponent getDeathMessage(EntityLivingBase entityLivingBaseIn) {
+                    return new TextComponentTranslation("death.spacetime.blackHole", entityLivingBaseIn.getDisplayName());
+                }
+            }.setDamageBypassesArmor().setDamageAllowedInCreativeMode();
             for (EntityLivingBase entity : world.getEntitiesWithinAABB(EntityLivingBase.class, eventHorizon)) {
-                if (!entity.isDead && entity.isEntityAlive()) {
-                    entity.attackEntityFrom(new DamageSource("blackHole") {
-                        @Override
-                        public ITextComponent getDeathMessage(EntityLivingBase entityLivingBaseIn) {
-                            return new TextComponentString(entityLivingBaseIn.getName() + " 永远的迷失在事件视界中");
-                        }
-                    }.setDamageBypassesArmor().setDamageAllowedInCreativeMode(), Float.MAX_VALUE);
+                if (entity.isEntityAlive()) {
+                    entity.hurtResistantTime = 0;
+                    entity.hurtTime = 0;
+                    if (!entity.attackEntityFrom(spacetime, Float.MAX_VALUE)) {
+                        entity.setHealth(0);
+                        entity.onDeath(spacetime);
+                    } else if (entity.isEntityAlive()) {
+                        entity.setHealth(0);
+                        entity.onDeath(spacetime);
+                    }
                 }
             }
         }
