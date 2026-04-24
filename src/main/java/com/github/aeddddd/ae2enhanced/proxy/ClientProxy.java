@@ -45,8 +45,15 @@ public class ClientProxy extends CommonProxy {
         registerBlockItemModel(ModBlocks.ASSEMBLY_STABILIZER);
 
         for (int i = 0; i < ItemUpgradeCard.COUNT; i++) {
+            String variant;
+            switch (i) {
+                case ItemUpgradeCard.META_PARALLEL:  variant = "upgrade_card_parallel";  break;
+                case ItemUpgradeCard.META_SPEED:     variant = "upgrade_card_speed";     break;
+                case ItemUpgradeCard.META_CAPACITY:  variant = "upgrade_card_capacity";  break;
+                default:                             variant = "upgrade_card";           break;
+            }
             ModelLoader.setCustomModelResourceLocation(ModItems.UPGRADE_CARD, i,
-                new ModelResourceLocation(ModItems.UPGRADE_CARD.getRegistryName(), "inventory"));
+                new ModelResourceLocation(AE2Enhanced.MOD_ID + ":" + variant, "inventory"));
         }
     }
 

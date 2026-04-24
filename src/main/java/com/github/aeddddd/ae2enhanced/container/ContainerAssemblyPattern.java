@@ -10,6 +10,8 @@ import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.SlotItemHandler;
 
+import javax.annotation.Nonnull;
+
 public class ContainerAssemblyPattern extends Container {
 
     private static final int PATTERN_X = 10;
@@ -40,6 +42,8 @@ public class ContainerAssemblyPattern extends Container {
             int localIndex = i - startSlot;
             int row = localIndex / 16;
             int col = localIndex % 16;
+            final int handlerIndex = i;
+            final IItemHandler handlerRef = handler;
             this.addSlotToContainer(new SlotItemHandler(handler, i,
                 PATTERN_X + col * 20, PATTERN_Y + row * 20) {
                 @Override
@@ -50,6 +54,23 @@ public class ContainerAssemblyPattern extends Container {
                 @Override
                 public int getSlotStackLimit() {
                     return 1;
+                }
+
+                /**
+                 * 覆盖 putStack，正确处理 insertItem 返回值。
+                 * 默认实现忽略返回值，导致 Container.mergeItemStack 认为物品已放入，
+                 * 但实际上传入的 stack 引用未被消耗，源槽位（背包）不会被清空，
+                 * 出现"样板还在背包中"的同步异常。
+                 */
+                @Override
+                public void putStack(@Nonnull ItemStack stack) {
+                    ItemStack remainder = handlerRef.insertItem(handlerIndex, stack, false);
+                    if (remainder.isEmpty()) {
+                        stack.setCount(0);
+                    } else {
+                        stack.setCount(remainder.getCount());
+                    }
+                    this.onSlotChanged();
                 }
             });
         }

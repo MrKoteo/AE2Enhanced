@@ -40,8 +40,8 @@ gui.ae2enhanced.pattern.next=Next →
 gui.ae2enhanced.pattern.page=Page %d/%d
 
 gui.ae2enhanced.tooltip.upgrades=§bUpgrades
-GUI.ae2enhanced.tooltip.upgrades.parallel=• Parallel Upgrade: Increases parallel cap
-GUI.ae2enhanced.tooltip.upgrades.speed=• Speed Upgrade: Reduces crafting time
+gui.ae2enhanced.tooltip.upgrades.parallel=• Parallel Upgrade: Increases parallel cap
+gui.ae2enhanced.tooltip.upgrades.speed=• Speed Upgrade: Reduces crafting time
 
 gui.ae2enhanced.tooltip.patterns=§bPattern Storage
 gui.ae2enhanced.tooltip.patterns.desc=Insert encoded Crafting Patterns

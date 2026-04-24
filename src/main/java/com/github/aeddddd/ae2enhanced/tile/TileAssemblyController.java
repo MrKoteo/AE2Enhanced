@@ -273,6 +273,23 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         if (world == null || world.isRemote) return;
 
         // 样板变化时触发 AE 网络重新扫描，1 tick 延迟合并同一 tick 内的连续变化
+        // 如果 activeMeInterfacePos 为 null，先尝试从结构坐标恢复，避免死锁：
+        // patternsDirty=true → 无法发送事件 → AE2 不扫描 → provideCrafting 不调用 → 永远无法恢复
+        if (patternsDirty && activeMeInterfacePos == null && formed) {
+            BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+            for (BlockPos rel : AssemblyStructure.PART1_SET) {
+                BlockPos mePos = origin.add(rel);
+                TileEntity te = world.getTileEntity(mePos);
+                if (te instanceof TileAssemblyMeInterface) {
+                    TileAssemblyMeInterface me = (TileAssemblyMeInterface) te;
+                    if (me.getControllerPos() != null && me.getControllerPos().equals(pos)) {
+                        activeMeInterfacePos = mePos;
+                        markDirty();
+                        break;
+                    }
+                }
+            }
+        }
         if (patternsDirty && activeMeInterfacePos != null) {
             patternsDirty = false;
             patternRefreshTicks = 1;

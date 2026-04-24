@@ -40,8 +40,8 @@ gui.ae2enhanced.pattern.next=下一页 →
 gui.ae2enhanced.pattern.page=第 %d/%d 页
 
 gui.ae2enhanced.tooltip.upgrades=§b升级模块
-GUI.ae2enhanced.tooltip.upgrades.parallel=• 并行升级卡：提升并行上限
-GUI.ae2enhanced.tooltip.upgrades.speed=• 速度升级卡：减少合成时间
+gui.ae2enhanced.tooltip.upgrades.parallel=• 并行升级卡：提升并行上限
+gui.ae2enhanced.tooltip.upgrades.speed=• 速度升级卡：减少合成时间
 
 gui.ae2enhanced.tooltip.patterns=§b样板存储
 gui.ae2enhanced.tooltip.patterns.desc=放入编码的合成样板（Crafting Pattern）
