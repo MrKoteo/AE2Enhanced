@@ -63,22 +63,27 @@ public class ItemUpgradeCard extends Item {
     public void addInformation(ItemStack stack, @Nullable World worldIn, List<String> tooltip, ITooltipFlag flagIn) {
         int meta = stack.getMetadata();
         int max = getMaxStackForMeta(meta);
+        String[] lines;
         switch (meta) {
             case META_PARALLEL:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip"));
-                tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip.detail", max));
+                lines = I18n.format("item.ae2enhanced.upgrade_card.parallel.tooltip.detail", max).split("\\n");
+                for (String line : lines) tooltip.add(line);
                 break;
             case META_SPEED:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip"));
-                tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip.detail", max));
+                lines = I18n.format("item.ae2enhanced.upgrade_card.speed.tooltip.detail", max).split("\\n");
+                for (String line : lines) tooltip.add(line);
                 break;
             case META_EFFICIENCY:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip"));
-                tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip.detail", max));
+                lines = I18n.format("item.ae2enhanced.upgrade_card.efficiency.tooltip.detail", max).split("\\n");
+                for (String line : lines) tooltip.add(line);
                 break;
             case META_CAPACITY:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip"));
-                tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip.detail", max));
+                lines = I18n.format("item.ae2enhanced.upgrade_card.capacity.tooltip.detail", max).split("\\n");
+                for (String line : lines) tooltip.add(line);
                 break;
             default:
                 tooltip.add(I18n.format("item.ae2enhanced.upgrade_card.reserved.tooltip"));

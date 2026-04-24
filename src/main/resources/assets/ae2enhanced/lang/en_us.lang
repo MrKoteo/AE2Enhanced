@@ -24,7 +24,7 @@ gui.ae2enhanced.formed.placeholder=will be available in Milestone 4
 gui.ae2enhanced.formed.bottom=AE Network Integration — Active
 gui.ae2enhanced.formed.network.active=§aNetwork: Online
 gui.ae2enhanced.formed.network.booting=§eNetwork: Booting
-gui.ae2enhanced.formed.network.offline=§cNetwork: Offline — Connect ME Interface to AE Cable
+gui.ae2enhanced.formed.network.offline=§cNetwork: Offline - Connect ME Interface to AE Cable
 
 gui.ae2enhanced.formed.upgrades=Upgrades
 gui.ae2enhanced.formed.patterns=Patterns
@@ -40,24 +40,24 @@ gui.ae2enhanced.pattern.next=Next →
 gui.ae2enhanced.pattern.page=Page %d/%d
 
 gui.ae2enhanced.tooltip.upgrades=§bUpgrades
-gui.ae2enhanced.tooltip.upgrades.parallel=• Parallel Upgrade: Increases parallel cap
-gui.ae2enhanced.tooltip.upgrades.speed=• Speed Upgrade: Reduces crafting time
+gui.ae2enhanced.tooltip.upgrades.parallel=• Parallel Extension Module: Increases batch parallel cap
+gui.ae2enhanced.tooltip.upgrades.speed=• Overclock Processing Module: Reduces batch cooldown
 
 gui.ae2enhanced.tooltip.patterns=§bPattern Storage
 gui.ae2enhanced.tooltip.patterns.desc=Insert encoded Crafting Patterns
 
-item.ae2enhanced.upgrade_card.parallel.name=Parallel Upgrade Card
-item.ae2enhanced.upgrade_card.parallel.tooltip=§bParallel Upgrade Card
-item.ae2enhanced.upgrade_card.parallel.tooltip.detail=§7Each card increases parallel cap (%d cards = infinite)
-item.ae2enhanced.upgrade_card.speed.name=Speed Upgrade Card
-item.ae2enhanced.upgrade_card.speed.tooltip=§bSpeed Upgrade Card
-item.ae2enhanced.upgrade_card.speed.tooltip.detail=§7Each card reduces crafting time by 50%% (%d cards = 1 tick)
-item.ae2enhanced.upgrade_card.efficiency.name=Efficiency Upgrade Card
-item.ae2enhanced.upgrade_card.efficiency.tooltip=§bEfficiency Upgrade Card
-item.ae2enhanced.upgrade_card.efficiency.tooltip.detail=§7Reserved feature, max %d cards
-item.ae2enhanced.upgrade_card.capacity.name=Capacity Upgrade Card
-item.ae2enhanced.upgrade_card.capacity.tooltip=§bCapacity Upgrade Card
-item.ae2enhanced.upgrade_card.capacity.tooltip.detail=§7Reserved feature, max %d cards
-item.ae2enhanced.upgrade_card.reserved1.name=Upgrade Card (Reserved)
-item.ae2enhanced.upgrade_card.reserved2.name=Upgrade Card (Reserved)
-item.ae2enhanced.upgrade_card.reserved.tooltip=§7Reserved feature, not yet implemented
+item.ae2enhanced.upgrade_card.parallel.name=Parallel Extension Module
+item.ae2enhanced.upgrade_card.parallel.tooltip=§b§lParallel Extension Module §r§8[Type: Parallel]
+item.ae2enhanced.upgrade_card.parallel.tooltip.detail=§7Increases the parallel processing limit for batch crafting.\n§7Thresholds: §e64 §8| §e2,048 §8| §e65,536 §8| §e2,097,152 §8| §e67,108,864 §8| §e∞\n§7Stack Limit: §b%d §7cards
+item.ae2enhanced.upgrade_card.speed.name=Overclock Processing Module
+item.ae2enhanced.upgrade_card.speed.tooltip=§b§lOverclock Processing Module §r§8[Type: Speed]
+item.ae2enhanced.upgrade_card.speed.tooltip.detail=§7Reduces batch crafting cooldown. Each tier reduces cooldown by 50%%.\n§7Max Cooldown: §e1 tick\n§7Stack Limit: §b%d §7cards
+item.ae2enhanced.upgrade_card.efficiency.name=Energy Optimization Module
+item.ae2enhanced.upgrade_card.efficiency.tooltip=§b§lEnergy Optimization Module §r§8[Type: Efficiency]
+item.ae2enhanced.upgrade_card.efficiency.tooltip.detail=§7Reduces AE network power consumption of the Assembly Hub.\n§7Stack Limit: §b%d §7cards
+item.ae2enhanced.upgrade_card.capacity.name=Dimensional Fold Module
+item.ae2enhanced.upgrade_card.capacity.tooltip=§b§lDimensional Fold Module §r§8[Type: Capacity]
+item.ae2enhanced.upgrade_card.capacity.tooltip.detail=§7Expands pattern storage dimensional capacity. Each tier adds §e480 §7slots (5 pages).\n§7Stack Limit: §b%d §7cards
+item.ae2enhanced.upgrade_card.reserved1.name=Extension Module (Reserved)
+item.ae2enhanced.upgrade_card.reserved2.name=Extension Module (Reserved)
+item.ae2enhanced.upgrade_card.reserved.tooltip=§7Reserved interface. Functionality not yet activated.
