@@ -2,8 +2,11 @@ package com.github.aeddddd.ae2enhanced.structure;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.ModBlocks;
+import com.github.aeddddd.ae2enhanced.block.BlockAssemblyController;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.BlockEvent;
@@ -96,7 +99,12 @@ public class StructureEventHandler {
 
         Set<BlockPos> controllers = index.getAll();
         for (BlockPos controllerPos : controllers) {
-            BlockPos origin = AssemblyStructure.getOriginFromController(controllerPos);
+            IBlockState state = world.getBlockState(controllerPos);
+            EnumFacing facing = EnumFacing.NORTH;
+            if (state.getBlock() instanceof BlockAssemblyController) {
+                facing = state.getValue(BlockAssemblyController.FACING);
+            }
+            BlockPos origin = AssemblyStructure.getOriginFromController(controllerPos, facing);
             BlockPos rel = changedPos.subtract(origin);
             if (AssemblyStructure.ALL_SET.contains(rel)) {
                 scheduleCheck(world.provider.getDimension(), controllerPos);

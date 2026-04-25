@@ -12,6 +12,7 @@ import appeng.api.networking.storage.IStorageGrid;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEItemStack;
+import com.github.aeddddd.ae2enhanced.block.BlockAssemblyController;
 import com.github.aeddddd.ae2enhanced.crafting.BlackHoleCraftingHelper;
 import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipe;
 import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipeRegistry;
@@ -235,7 +236,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
      * 粒子沿切向运动并螺旋向内，颜色为偏紫的随机色调。
      */
     private void spawnBlackHoleParticles() {
-        BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+        EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+        BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
         double cx = origin.getX() + 0.5;
         double cy = origin.getY() + 0.5;
         double cz = origin.getZ() + 0.5;
@@ -359,7 +361,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     @Override
     @Nonnull
     public AxisAlignedBB getRenderBoundingBox() {
-        BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+        EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+        BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
         return new AxisAlignedBB(
             origin.getX() - 4, origin.getY() - 4, origin.getZ() - 4,
             origin.getX() + 5, origin.getY() + 5, origin.getZ() + 5
@@ -380,7 +383,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
         // 黑洞事件视界：秒杀进入中心区域的生物；16次未死则放逐至随机维度
         if (formed) {
-            BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+            EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+            BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
             AxisAlignedBB eventHorizon = new AxisAlignedBB(
                 origin.getX() - 2, origin.getY() - 2, origin.getZ() - 2,
                 origin.getX() + 3, origin.getY() + 3, origin.getZ() + 3
@@ -444,7 +448,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         // 如果 activeMeInterfacePos 为 null，先尝试从结构坐标恢复，避免死锁：
         // patternsDirty=true → 无法发送事件 → AE2 不扫描 → provideCrafting 不调用 → 永远无法恢复
         if (patternsDirty && activeMeInterfacePos == null && formed) {
-            BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+            EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+            BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
             for (BlockPos rel : AssemblyStructure.PART1_SET) {
                 BlockPos mePos = origin.add(rel);
                 TileEntity te = world.getTileEntity(mePos);
@@ -734,7 +739,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         if (uniqueTypes.size() > 5) {
             // 溢出销毁：清空缓存并释放特效
             blackHoleBuffer.clear();
-            BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+            EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+            BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
             world.spawnParticle(EnumParticleTypes.EXPLOSION_HUGE,
                     origin.getX() + 0.5, origin.getY() + 0.5, origin.getZ() + 0.5, 0, 0, 0);
             world.playSound(null, origin, SoundEvents.ENTITY_GENERIC_EXPLODE,
@@ -882,7 +888,8 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
         // 旧存档可能未保存 activeMeInterfacePos，尝试从结构坐标恢复
         if (activeMeInterfacePos == null && formed) {
-            BlockPos origin = AssemblyStructure.getOriginFromController(pos);
+            EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
+            BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
             for (BlockPos rel : AssemblyStructure.PART1_SET) {
                 BlockPos mePos = origin.add(rel);
                 TileEntity te = world.getTileEntity(mePos);

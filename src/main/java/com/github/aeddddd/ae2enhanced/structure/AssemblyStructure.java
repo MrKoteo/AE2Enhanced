@@ -1,9 +1,11 @@
 package com.github.aeddddd.ae2enhanced.structure;
 
 import com.github.aeddddd.ae2enhanced.ModBlocks;
+import com.github.aeddddd.ae2enhanced.block.BlockAssemblyController;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
@@ -389,44 +391,69 @@ public class AssemblyStructure {
     }
 
     /**
+     * 将默认朝向（北）的相对坐标按控制器朝向旋转。
+     */
+    public static BlockPos rotate(BlockPos rel, EnumFacing facing) {
+        if (facing == EnumFacing.NORTH) return rel;
+        int x = rel.getX();
+        int y = rel.getY();
+        int z = rel.getZ();
+        switch (facing) {
+            case SOUTH: return new BlockPos(-x, y, -z);
+            case EAST:  return new BlockPos(-z, y, x);
+            case WEST:  return new BlockPos(z, y, -x);
+            default:    return rel;
+        }
+    }
+
+    /**
      * 由控制器位置获取几何中心原点
      */
-    public static BlockPos getOriginFromController(BlockPos controllerPos) {
-        return controllerPos.add(0, 0, 7);
+    public static BlockPos getOriginFromController(BlockPos controllerPos, EnumFacing facing) {
+        return controllerPos.add(rotate(new BlockPos(0, 0, 7), facing));
+    }
+
+    private static EnumFacing getControllerFacing(World world, BlockPos controllerPos) {
+        IBlockState state = world.getBlockState(controllerPos);
+        if (state.getBlock() instanceof BlockAssemblyController) {
+            return state.getValue(BlockAssemblyController.FACING);
+        }
+        return EnumFacing.NORTH;
     }
 
     /**
      * 验证结构完整性（优先检查 core 与 part1）
      */
     public static boolean validate(World world, BlockPos controllerPos) {
-        BlockPos origin = getOriginFromController(controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
 
         // 优先检查 core
-        if (!checkBlock(world, origin, CORE_SET, ModBlocks.ASSEMBLY_CONTROLLER)) {
+        if (!checkBlock(world, origin, CORE_SET, ModBlocks.ASSEMBLY_CONTROLLER, facing)) {
             return false;
         }
 
         // 优先检查 part1（ME 接口，结构完整性关键）
-        if (!checkBlock(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE)) {
+        if (!checkBlock(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, facing)) {
             return false;
         }
 
-        if (!checkBlock(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING)) {
+        if (!checkBlock(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, facing)) {
             return false;
         }
-        if (!checkBlock(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL)) {
+        if (!checkBlock(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, facing)) {
             return false;
         }
-        if (!checkBlock(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER)) {
+        if (!checkBlock(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, facing)) {
             return false;
         }
 
         return true;
     }
 
-    private static boolean checkBlock(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected) {
+    private static boolean checkBlock(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected, EnumFacing facing) {
         for (BlockPos rel : relativeSet) {
-            BlockPos actual = origin.add(rel);
+            BlockPos actual = origin.add(rotate(rel, facing));
             if (!world.isBlockLoaded(actual)) {
                 continue; // chunk 未加载，保持当前状态，不判定为缺失
             }
@@ -441,20 +468,21 @@ public class AssemblyStructure {
      * 获取缺失方块清单（用于未组装 GUI 显示）
      */
     public static Map<Block, Integer> getMissingMap(World world, BlockPos controllerPos) {
-        BlockPos origin = getOriginFromController(controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
         Map<Block, Integer> missing = new LinkedHashMap<>();
 
-        countMissing(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, missing);
-        countMissing(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, missing);
-        countMissing(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, missing);
-        countMissing(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, missing);
+        countMissing(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, missing, facing);
+        countMissing(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, missing, facing);
+        countMissing(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, missing, facing);
+        countMissing(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, missing, facing);
 
         return missing;
     }
 
-    private static void countMissing(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected, Map<Block, Integer> missing) {
+    private static void countMissing(World world, BlockPos origin, Set<BlockPos> relativeSet, Block expected, Map<Block, Integer> missing, EnumFacing facing) {
         for (BlockPos rel : relativeSet) {
-            BlockPos actual = origin.add(rel);
+            BlockPos actual = origin.add(rotate(rel, facing));
             if (!world.isBlockLoaded(actual)) {
                 continue; // chunk 未加载，不计入缺失
             }
@@ -473,8 +501,9 @@ public class AssemblyStructure {
         if (tile != null) {
             tile.assemble();
         }
-        BlockPos origin = getOriginFromController(controllerPos);
-        updateMeInterfaceState(world, origin, true, controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
+        updateMeInterfaceState(world, origin, true, controllerPos, facing);
     }
 
     /**
@@ -486,15 +515,16 @@ public class AssemblyStructure {
         if (tile != null) {
             tile.disassemble();
         }
-        BlockPos origin = getOriginFromController(controllerPos);
-        updateMeInterfaceState(world, origin, false, controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
+        updateMeInterfaceState(world, origin, false, controllerPos, facing);
     }
 
-    private static void updateMeInterfaceState(World world, BlockPos origin, boolean formed, BlockPos controllerPos) {
+    private static void updateMeInterfaceState(World world, BlockPos origin, boolean formed, BlockPos controllerPos, EnumFacing facing) {
         IBlockState state = ModBlocks.ASSEMBLY_ME_INTERFACE.getDefaultState()
             .withProperty(com.github.aeddddd.ae2enhanced.block.BlockAssemblyMeInterface.FORMED, formed);
         for (BlockPos rel : PART1_SET) {
-            BlockPos pos = origin.add(rel);
+            BlockPos pos = origin.add(rotate(rel, facing));
             if (world.getBlockState(pos).getBlock() == ModBlocks.ASSEMBLY_ME_INTERFACE) {
                 world.setBlockState(pos, state);
                 net.minecraft.tileentity.TileEntity te = world.getTileEntity(pos);
@@ -522,20 +552,21 @@ public class AssemblyStructure {
      */
     public static void placeMissingBlocks(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
         if (world.isRemote) return;
-        BlockPos origin = getOriginFromController(controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
 
-        placeBlocks(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE);
-        placeBlocks(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING);
-        placeBlocks(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL);
-        placeBlocks(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER);
+        placeBlocks(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, facing);
+        placeBlocks(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, facing);
+        placeBlocks(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, facing);
+        placeBlocks(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, facing);
 
         // 立即触发组装（跳过 20 tick 等待）
         assemble(world, controllerPos);
     }
 
-    private static void placeBlocks(World world, BlockPos origin, Set<BlockPos> set, Block block) {
+    private static void placeBlocks(World world, BlockPos origin, Set<BlockPos> set, Block block, EnumFacing facing) {
         for (BlockPos rel : set) {
-            BlockPos pos = origin.add(rel);
+            BlockPos pos = origin.add(rotate(rel, facing));
             if (world.getBlockState(pos).getBlock() != block) {
                 world.setBlockState(pos, block.getDefaultState());
             }
@@ -548,13 +579,14 @@ public class AssemblyStructure {
      */
     public static boolean tryConsumeAndPlace(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
         if (world.isRemote) return false;
-        BlockPos origin = getOriginFromController(controllerPos);
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+        BlockPos origin = getOriginFromController(controllerPos, facing);
 
         Map<Block, Integer> missing = new LinkedHashMap<>();
-        countMissing(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, missing);
-        countMissing(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, missing);
-        countMissing(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, missing);
-        countMissing(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, missing);
+        countMissing(world, origin, PART1_SET, ModBlocks.ASSEMBLY_ME_INTERFACE, missing, facing);
+        countMissing(world, origin, PART2_SET, ModBlocks.ASSEMBLY_CASING, missing, facing);
+        countMissing(world, origin, PART3_SET, ModBlocks.ASSEMBLY_INNER_WALL, missing, facing);
+        countMissing(world, origin, PART4_SET, ModBlocks.ASSEMBLY_STABILIZER, missing, facing);
 
         if (missing.isEmpty()) {
             assemble(world, controllerPos);
