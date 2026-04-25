@@ -1,9 +1,18 @@
 package com.github.aeddddd.ae2enhanced;
 
+import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipe;
+import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipeRegistry;
+import com.github.aeddddd.ae2enhanced.crafting.SingularityRecipe;
+import com.github.aeddddd.ae2enhanced.crafting.SingularityRecipeRegistry;
 import com.github.aeddddd.ae2enhanced.gui.GuiHandler;
 import com.github.aeddddd.ae2enhanced.network.PacketPatternPage;
 import com.github.aeddddd.ae2enhanced.network.PacketRequestAssembly;
 import com.github.aeddddd.ae2enhanced.proxy.CommonProxy;
+import net.minecraft.init.Blocks;
+import net.minecraft.init.Items;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -57,5 +66,39 @@ public class AE2Enhanced {
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
+        registerSingularityRecipes();
+    }
+
+    private void registerSingularityRecipes() {
+        // 系统 A：黑洞生成仪式 —— 64 AE2 奇点 + 4 下界之星 + 1 ME 控制器方块
+        // 手持下界之星右键 ME 控制器触发，生成微型奇点
+        Item ae2Material = Item.REGISTRY.getObject(new ResourceLocation("appliedenergistics2", "material"));
+        if (ae2Material != null) {
+            java.util.List<ItemStack> ritualInputs = new java.util.ArrayList<>();
+            // AE2 奇点 metadata = 47
+            ritualInputs.add(new ItemStack(ae2Material, 64, 47));
+            ritualInputs.add(new ItemStack(Items.NETHER_STAR, 4));
+            SingularityRecipeRegistry.register(new SingularityRecipe("micro_singularity_ritual", ritualInputs));
+            AE2Enhanced.LOGGER.info("注册黑洞生成仪式配方: micro_singularity_ritual");
+        } else {
+            AE2Enhanced.LOGGER.warn("无法获取 AE2 材料物品，黑洞生成仪式配方未注册");
+        }
+
+        // 系统 B：黑洞合成 —— 把物品投入黑洞事件视界后转化为产物
+        registerBlackHoleRecipes();
+    }
+
+    private void registerBlackHoleRecipes() {
+        // 测试配方：8 石头 + 1 钻石 → 1 黑曜石（验证黑洞合成系统）
+        java.util.Map<Item, Integer> bhInputs = new java.util.HashMap<>();
+        bhInputs.put(Item.getItemFromBlock(Blocks.STONE), 8);
+        bhInputs.put(Items.DIAMOND, 1);
+        BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
+                "test_obsidian",
+                bhInputs,
+                new ItemStack(Blocks.OBSIDIAN, 1)
+        ));
+
+        AE2Enhanced.LOGGER.info("注册黑洞合成配方数量: {}", BlackHoleRecipeRegistry.getRecipes().size());
     }
 }

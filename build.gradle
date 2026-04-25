@@ -31,6 +31,8 @@ minecraft {
 repositories {
     mavenCentral()
     maven { url = 'https://maven.cleanroommc.com' }
+    maven { url = 'https://dvs1.progwml6.com/files/maven' }
+    maven { url = 'https://maven.blamejared.com' }
 }
 
 dependencies {
@@ -43,6 +45,9 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+
+    deobfProvided 'mezz.jei:jei_1.12.2:4.16.1.302:api'
+    deobfProvided 'CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.20.574'
 }
 
 test {

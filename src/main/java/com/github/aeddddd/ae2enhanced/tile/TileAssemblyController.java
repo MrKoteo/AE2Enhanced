@@ -12,6 +12,7 @@ import appeng.api.networking.storage.IStorageGrid;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEItemStack;
+import com.github.aeddddd.ae2enhanced.crafting.BlackHoleCraftingHelper;
 import com.github.aeddddd.ae2enhanced.item.ItemUpgradeCard;
 import com.github.aeddddd.ae2enhanced.structure.AssemblyStructure;
 import net.minecraft.entity.EntityLivingBase;
@@ -38,6 +39,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentTranslation;
 
 
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.items.CapabilityItemHandler;
@@ -158,6 +160,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     private final Map<ICraftingPatternDetails, Boolean> patternVirtualCache = new HashMap<>();
     private final List<ItemStack> pendingOutputs = new ArrayList<>();
     private final List<Integer> jobTimers = new ArrayList<>();
+    private final Map<UUID, Integer> eventHorizonStrikes = new HashMap<>();
     private boolean patternsDirty = false;
     private int patternRefreshTicks = 0;
 
@@ -366,7 +369,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             return;
         }
 
-        // 黑洞事件视界：秒杀进入中心区域的生物
+        // 黑洞事件视界：秒杀进入中心区域的生物；16次未死则放逐至随机维度
         if (formed) {
             BlockPos origin = AssemblyStructure.getOriginFromController(pos);
             AxisAlignedBB eventHorizon = new AxisAlignedBB(
@@ -379,19 +382,37 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
                     return new TextComponentTranslation("death.spacetime.blackHole", entityLivingBaseIn.getDisplayName());
                 }
             }.setDamageBypassesArmor().setDamageAllowedInCreativeMode();
-            for (EntityLivingBase entity : world.getEntitiesWithinAABB(EntityLivingBase.class, eventHorizon)) {
-                if (entity.isEntityAlive()) {
-                    entity.hurtResistantTime = 0;
-                    entity.hurtTime = 0;
-                    if (!entity.attackEntityFrom(spacetime, Float.MAX_VALUE)) {
-                        entity.setHealth(0);
-                        entity.onDeath(spacetime);
-                    } else if (entity.isEntityAlive()) {
-                        entity.setHealth(0);
-                        entity.onDeath(spacetime);
-                    }
+            List<EntityLivingBase> inHorizon = world.getEntitiesWithinAABB(EntityLivingBase.class, eventHorizon);
+            Set<UUID> currentUuids = new HashSet<>();
+            for (EntityLivingBase entity : inHorizon) {
+                if (!entity.isEntityAlive()) continue;
+                UUID uuid = entity.getUniqueID();
+                currentUuids.add(uuid);
+                int strikes = eventHorizonStrikes.getOrDefault(uuid, 0) + 1;
+                entity.hurtResistantTime = 0;
+                entity.hurtTime = 0;
+                boolean killed = false;
+                if (entity.attackEntityFrom(spacetime, Float.MAX_VALUE)) {
+                    if (!entity.isEntityAlive()) killed = true;
+                }
+                if (!killed) {
+                    entity.setHealth(0);
+                    entity.onDeath(spacetime);
+                    if (!entity.isEntityAlive()) killed = true;
+                }
+                if (killed) {
+                    eventHorizonStrikes.remove(uuid);
+                } else if (strikes >= 16) {
+                    eventHorizonStrikes.remove(uuid);
+                    teleportToRandomDimension(entity);
+                } else {
+                    eventHorizonStrikes.put(uuid, strikes);
                 }
             }
+            eventHorizonStrikes.keySet().removeIf(uuid -> !currentUuids.contains(uuid));
+
+            // 黑洞合成：对事件视界内的物品执行合成或销毁
+            BlackHoleCraftingHelper.tryCraft(world, origin);
         }
 
         // 样板变化时触发 AE 网络重新扫描，1 tick 延迟合并同一 tick 内的连续变化
@@ -480,6 +501,24 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             markDirty();
             world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
         }
+    }
+
+    /**
+     * 将实体强制传送至一个随机已注册维度。
+     * 用于事件视界 16 次击杀失败后的最终放逐手段。
+     */
+    private void teleportToRandomDimension(EntityLivingBase entity) {
+        Integer[] dims = DimensionManager.getRegisteredDimensions().keySet().toArray(new Integer[0]);
+        if (dims.length == 0) return;
+        int targetDim;
+        if (dims.length == 1) {
+            targetDim = dims[0];
+        } else {
+            do {
+                targetDim = dims[world.rand.nextInt(dims.length)];
+            } while (targetDim == entity.dimension);
+        }
+        entity.changeDimension(targetDim);
     }
 
     // ---------- 产物注入（BatchExporter 风格，合并后批量注入） ----------
