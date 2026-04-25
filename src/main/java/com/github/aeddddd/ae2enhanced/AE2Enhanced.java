@@ -62,12 +62,13 @@ public class AE2Enhanced {
     public void init(FMLInitializationEvent event) {
         NetworkRegistry.INSTANCE.registerGuiHandler(instance, new GuiHandler());
         proxy.init(event);
+        // 配方注册在 init 阶段完成，确保 CraftTweaker loadComplete 执行脚本时配方已存在
+        registerSingularityRecipes();
     }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
-        registerSingularityRecipes();
     }
 
     private void registerSingularityRecipes() {

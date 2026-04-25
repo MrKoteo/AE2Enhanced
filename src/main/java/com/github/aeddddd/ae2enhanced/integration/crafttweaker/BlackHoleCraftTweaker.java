@@ -76,7 +76,14 @@ public class BlackHoleCraftTweaker {
 
         @Override
         public void apply() {
-            BlackHoleRecipeRegistry.removeById(id);
+            boolean removed = BlackHoleRecipeRegistry.removeById(id);
+            if (!removed) {
+                AE2Enhanced.LOGGER.warn("[AE2E CT] removeRecipe('{}'): recipe not found at apply-time. " +
+                    "Available ids: {}", id,
+                    BlackHoleRecipeRegistry.getRecipes().stream().map(BlackHoleRecipe::getId).collect(java.util.stream.Collectors.toList()));
+            } else {
+                AE2Enhanced.LOGGER.info("[AE2E CT] removeRecipe('{}'): removed successfully", id);
+            }
         }
 
         @Override
