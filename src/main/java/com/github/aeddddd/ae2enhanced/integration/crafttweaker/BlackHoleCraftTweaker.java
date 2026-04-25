@@ -47,16 +47,17 @@ public class BlackHoleCraftTweaker {
 
         @Override
         public void apply() {
-            Map<net.minecraft.item.Item, Integer> map = new HashMap<>();
+            Map<String, Integer> map = new HashMap<>();
             for (IItemStack stack : inputs) {
-                net.minecraft.item.Item item = (net.minecraft.item.Item) stack.getDefinition().getInternal();
-                map.merge(item, stack.getAmount(), Integer::sum);
+                net.minecraft.item.ItemStack internal = (net.minecraft.item.ItemStack) stack.getInternal();
+                String key = BlackHoleRecipe.keyOf(internal);
+                map.merge(key, stack.getAmount(), Integer::sum);
             }
-            net.minecraft.item.Item outItem = (net.minecraft.item.Item) output.getDefinition().getInternal();
+            net.minecraft.item.ItemStack outStack = (net.minecraft.item.ItemStack) output.getInternal();
             BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
                     "ct_" + output.getName(),
                     map,
-                    new net.minecraft.item.ItemStack(outItem, output.getAmount())
+                    outStack.copy()
             ));
         }
 

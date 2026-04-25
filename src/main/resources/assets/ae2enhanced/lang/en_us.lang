@@ -66,4 +66,8 @@ item.ae2enhanced.upgrade_card.reserved1.name=Extension Module (Reserved)
 item.ae2enhanced.upgrade_card.reserved2.name=Extension Module (Reserved)
 item.ae2enhanced.upgrade_card.reserved.tooltip=§7Reserved interface. Functionality not yet activated.
 
+item.ae2enhanced.conformal_invariant_charge.name=Conformal Invariant Charge
+item.ae2enhanced.differential_form_stabilizer.name=Differential Form Stabilizer
+item.ae2enhanced.stable_spacetime_manifold.name=Stable Spacetime Manifold
+
 death.spacetime.blackHole=%1$s was forever lost in the event horizon

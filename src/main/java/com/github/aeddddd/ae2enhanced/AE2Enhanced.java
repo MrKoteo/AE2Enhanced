@@ -20,6 +20,7 @@ import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
+import net.minecraftforge.fml.common.registry.GameRegistry;
 import net.minecraftforge.fml.relauncher.Side;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -89,16 +90,52 @@ public class AE2Enhanced {
     }
 
     private void registerBlackHoleRecipes() {
-        // 测试配方：8 石头 + 1 钻石 → 1 黑曜石（验证黑洞合成系统）
-        java.util.Map<Item, Integer> bhInputs = new java.util.HashMap<>();
-        bhInputs.put(Item.getItemFromBlock(Blocks.STONE), 8);
-        bhInputs.put(Items.DIAMOND, 1);
+        // 保留测试配方：8 石头 + 1 钻石 → 1 黑曜石（验证黑洞合成系统）
+        java.util.Map<String, Integer> bhInputs = new java.util.HashMap<>();
+        bhInputs.put(BlackHoleRecipe.keyOf(new ItemStack(Blocks.STONE)), 8);
+        bhInputs.put(BlackHoleRecipe.keyOf(new ItemStack(Items.DIAMOND)), 1);
         BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
                 "test_obsidian",
                 bhInputs,
                 new ItemStack(Blocks.OBSIDIAN, 1)
         ));
 
+        // 新材料黑洞合成配方（key 格式："registryName:meta"）
+        Item ae2Material = Item.REGISTRY.getObject(new ResourceLocation("appliedenergistics2", "material"));
+        if (ae2Material != null) {
+            // 稳态时空流形：16 空间组件(material:34) + 64 奇点(material:47)
+            java.util.Map<String, Integer> manifoldInputs = new java.util.HashMap<>();
+            manifoldInputs.put("appliedenergistics2:material:34", 16);
+            manifoldInputs.put("appliedenergistics2:material:47", 64);
+            BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
+                    "stable_spacetime_manifold",
+                    manifoldInputs,
+                    new ItemStack(ModItems.STABLE_SPACETIME_MANIFOLD, 1)
+            ));
+
+            // 微分形式稳定单元：128 奇点(material:47) + 16 下界之星
+            java.util.Map<String, Integer> stabilizerInputs = new java.util.HashMap<>();
+            stabilizerInputs.put("appliedenergistics2:material:47", 128);
+            stabilizerInputs.put(BlackHoleRecipe.keyOf(new ItemStack(Items.NETHER_STAR)), 16);
+            BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
+                    "differential_form_stabilizer",
+                    stabilizerInputs,
+                    new ItemStack(ModItems.DIFFERENTIAL_FORM_STABILIZER, 1)
+            ));
+        }
+
+        // 共形不变荷：16 稳态时空流形 + 16 微分形式稳定单元
+        java.util.Map<String, Integer> chargeInputs = new java.util.HashMap<>();
+        chargeInputs.put(BlackHoleRecipe.keyOf(new ItemStack(ModItems.STABLE_SPACETIME_MANIFOLD)), 16);
+        chargeInputs.put(BlackHoleRecipe.keyOf(new ItemStack(ModItems.DIFFERENTIAL_FORM_STABILIZER)), 16);
+        BlackHoleRecipeRegistry.register(new BlackHoleRecipe(
+                "conformal_invariant_charge",
+                chargeInputs,
+                new ItemStack(ModItems.CONFORMAL_CHARGE, 1)
+        ));
+
         AE2Enhanced.LOGGER.info("注册黑洞合成配方数量: {}", BlackHoleRecipeRegistry.getRecipes().size());
     }
+
+
 }

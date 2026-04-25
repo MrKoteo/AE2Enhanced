@@ -4,6 +4,7 @@ import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipe;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +28,23 @@ public class BlackHoleRecipeWrapper implements IRecipeWrapper {
     @Override
     public void getIngredients(IIngredients ingredients) {
         List<List<ItemStack>> inputs = new ArrayList<>();
-        for (Map.Entry<net.minecraft.item.Item, Integer> entry : recipe.getInputs().entrySet()) {
+        for (Map.Entry<String, Integer> entry : recipe.getInputs().entrySet()) {
+            String key = entry.getKey();
+            int count = entry.getValue();
+            // 解析 "registryName:meta" 格式
+            int lastColon = key.lastIndexOf(':');
+            if (lastColon <= 0) continue;
+            String registryName = key.substring(0, lastColon);
+            int meta;
+            try {
+                meta = Integer.parseInt(key.substring(lastColon + 1));
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            net.minecraft.item.Item item = net.minecraft.item.Item.REGISTRY.getObject(new ResourceLocation(registryName));
+            if (item == null) continue;
             List<ItemStack> subList = new ArrayList<>();
-            subList.add(new ItemStack(entry.getKey(), entry.getValue()));
+            subList.add(new ItemStack(item, count, meta));
             inputs.add(subList);
         }
         ingredients.setInputLists(ItemStack.class, inputs);

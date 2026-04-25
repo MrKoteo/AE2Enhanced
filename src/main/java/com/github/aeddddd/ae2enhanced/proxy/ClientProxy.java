@@ -60,6 +60,11 @@ public class ClientProxy extends CommonProxy {
             new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_capacity", "inventory")
         );
 
+        // 新材料物品模型
+        registerItemModel(ModItems.CONFORMAL_CHARGE);
+        registerItemModel(ModItems.DIFFERENTIAL_FORM_STABILIZER);
+        registerItemModel(ModItems.STABLE_SPACETIME_MANIFOLD);
+
         // 使用 ItemMeshDefinition 根据 metadata 动态选择模型
         ModelLoader.setCustomMeshDefinition(ModItems.UPGRADE_CARD, stack -> {
             int meta = stack.getMetadata();
@@ -83,5 +88,11 @@ public class ClientProxy extends CommonProxy {
             ModelLoader.setCustomModelResourceLocation(item, 0,
                 new ModelResourceLocation(block.getRegistryName(), "inventory"));
         }
+    }
+
+    @SideOnly(Side.CLIENT)
+    private static void registerItemModel(Item item) {
+        ModelLoader.setCustomModelResourceLocation(item, 0,
+            new ModelResourceLocation(item.getRegistryName(), "inventory"));
     }
 }

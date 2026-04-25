@@ -3,7 +3,6 @@ package com.github.aeddddd.ae2enhanced.crafting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.item.Item;
 
 /**
  * 黑洞合成配方注册表。
@@ -19,7 +18,7 @@ public class BlackHoleRecipeRegistry {
     /**
      * 在 found 中寻找第一个匹配的配方。
      */
-    public static BlackHoleRecipe findMatching(Map<Item, Integer> found) {
+    public static BlackHoleRecipe findMatching(Map<String, Integer> found) {
         for (BlackHoleRecipe recipe : RECIPES) {
             if (recipe.matches(found)) {
                 return recipe;

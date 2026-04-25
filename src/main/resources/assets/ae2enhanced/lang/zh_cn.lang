@@ -66,4 +66,8 @@ item.ae2enhanced.upgrade_card.reserved1.name=扩展模块 (预留)
 item.ae2enhanced.upgrade_card.reserved2.name=扩展模块 (预留)
 item.ae2enhanced.upgrade_card.reserved.tooltip=§7预留接口. 功能尚未激活.
 
+item.ae2enhanced.conformal_invariant_charge.name=共形不变荷
+item.ae2enhanced.differential_form_stabilizer.name=微分形式稳定单元
+item.ae2enhanced.stable_spacetime_manifold.name=稳态时空流形
+
 death.spacetime.blackHole=%1$s 永远的迷失在事件视界中

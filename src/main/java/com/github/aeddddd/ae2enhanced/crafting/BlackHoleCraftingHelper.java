@@ -1,7 +1,6 @@
 package com.github.aeddddd.ae2enhanced.crafting;
 
 import net.minecraft.entity.item.EntityItem;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
@@ -43,28 +42,28 @@ public class BlackHoleCraftingHelper {
         List<EntityItem> items = world.getEntitiesWithinAABB(EntityItem.class, area);
         if (items.isEmpty()) return;
 
-        // 累加物品数量
-        Map<Item, Integer> found = new HashMap<>();
+        // 累加物品数量（区分 metadata）
+        Map<String, Integer> found = new HashMap<>();
         for (EntityItem entityItem : items) {
             ItemStack stack = entityItem.getItem();
             if (stack.isEmpty()) continue;
-            found.merge(stack.getItem(), stack.getCount(), Integer::sum);
+            found.merge(BlackHoleRecipe.keyOf(stack), stack.getCount(), Integer::sum);
         }
 
         // 匹配配方
         BlackHoleRecipe recipe = BlackHoleRecipeRegistry.findMatching(found);
         if (recipe != null) {
             // 消耗材料
-            Map<Item, Integer> remaining = new HashMap<>(recipe.getInputs());
+            Map<String, Integer> remaining = new HashMap<>(recipe.getInputs());
             for (EntityItem entityItem : items) {
                 ItemStack stack = entityItem.getItem();
                 if (stack.isEmpty()) continue;
-                Item item = stack.getItem();
-                int needed = remaining.getOrDefault(item, 0);
+                String key = BlackHoleRecipe.keyOf(stack);
+                int needed = remaining.getOrDefault(key, 0);
                 if (needed > 0) {
                     int consume = Math.min(needed, stack.getCount());
                     stack.shrink(consume);
-                    remaining.put(item, needed - consume);
+                    remaining.put(key, needed - consume);
                     if (stack.isEmpty()) {
                         entityItem.setDead();
                     }

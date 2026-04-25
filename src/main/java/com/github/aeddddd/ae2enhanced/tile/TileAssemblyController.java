@@ -725,11 +725,11 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     private void tryBlackHoleCraft() {
         if (blackHoleBuffer.isEmpty()) return;
 
-        // 统计物品种类
-        Set<Item> uniqueTypes = new HashSet<>();
+        // 统计物品种类（区分 metadata）
+        Set<String> uniqueTypes = new HashSet<>();
         for (ItemStack stack : blackHoleBuffer) {
             if (!stack.isEmpty()) {
-                uniqueTypes.add(stack.getItem());
+                uniqueTypes.add(BlackHoleRecipe.keyOf(stack));
             }
         }
         if (uniqueTypes.size() > 5) {
@@ -743,11 +743,11 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             return;
         }
 
-        // 累加物品数量
-        Map<Item, Integer> found = new HashMap<>();
+        // 累加物品数量（区分 metadata）
+        Map<String, Integer> found = new HashMap<>();
         for (ItemStack stack : blackHoleBuffer) {
             if (!stack.isEmpty()) {
-                found.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                found.merge(BlackHoleRecipe.keyOf(stack), stack.getCount(), Integer::sum);
             }
         }
 
@@ -755,7 +755,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         BlackHoleRecipe recipe = BlackHoleRecipeRegistry.findMatching(found);
         if (recipe != null) {
             // 消耗材料
-            Map<Item, Integer> remaining = new HashMap<>(recipe.getInputs());
+            Map<String, Integer> remaining = new HashMap<>(recipe.getInputs());
             Iterator<ItemStack> it = blackHoleBuffer.iterator();
             while (it.hasNext()) {
                 ItemStack stack = it.next();
@@ -763,12 +763,12 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
                     it.remove();
                     continue;
                 }
-                Item item = stack.getItem();
-                int needed = remaining.getOrDefault(item, 0);
+                String key = BlackHoleRecipe.keyOf(stack);
+                int needed = remaining.getOrDefault(key, 0);
                 if (needed > 0) {
                     int consume = Math.min(needed, stack.getCount());
                     stack.shrink(consume);
-                    remaining.put(item, needed - consume);
+                    remaining.put(key, needed - consume);
                     if (stack.isEmpty()) {
                         it.remove();
                     }
