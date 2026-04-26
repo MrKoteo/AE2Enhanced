@@ -12,6 +12,7 @@ import appeng.api.networking.storage.IStorageGrid;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEItemStack;
+import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.block.BlockAssemblyController;
 import com.github.aeddddd.ae2enhanced.crafting.BlackHoleCraftingHelper;
 import com.github.aeddddd.ae2enhanced.crafting.BlackHoleRecipe;
@@ -169,6 +170,15 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     /** 缓存样板是否为纯虚拟合成（getRemainingItems 全空），String key 避免 hash 碰撞 */
     private final Map<ICraftingPatternDetails, Boolean> patternVirtualCache = new HashMap<>();
     private final List<ItemStack> pendingOutputs = new ArrayList<>();
+    private static final int MAX_PENDING_OUTPUTS = 4096;
+
+    /** 真实合成 batch 信息缓存：配方、催化剂槽位、槽位物品模板 */
+    public static class PatternBatchInfo {
+        public IRecipe recipe;
+        public java.util.BitSet catalystSlots;
+        public IAEItemStack[] slotTemplates;
+    }
+    private final Map<ICraftingPatternDetails, PatternBatchInfo> patternBatchInfoCache = new HashMap<>();
     private final List<Integer> jobTimers = new ArrayList<>();
     private final Map<UUID, Integer> eventHorizonStrikes = new HashMap<>();
     private boolean patternsDirty = false;
@@ -878,6 +888,84 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
         appeng.me.helpers.AENetworkProxy proxy = ((TileAssemblyMeInterface) te).getProxy();
         IGridNode node = proxy.getNode();
         return node != null && node.getGrid() != null;
+    }
+
+    /**
+     * 供 Mixin 调用：获取或创建 PatternBatchInfo（含催化剂识别）。
+     * 首次调用时从 MECraftingInventory SIMULATE 提取 1 份原料构造 InventoryCrafting，
+     * 执行 getRemainingItems() 识别催化剂槽位（remaining 与 input 完全一致）。
+     */
+    public PatternBatchInfo getPatternBatchInfo(ICraftingPatternDetails details,
+                                                 appeng.crafting.MECraftingInventory meInv,
+                                                 appeng.api.networking.security.IActionSource source) {
+        PatternBatchInfo cached = patternBatchInfoCache.get(details);
+        if (cached != null) return cached;
+
+        IAEItemStack[] inputs = details.getInputs();
+        if (inputs == null) return null;
+
+        PatternBatchInfo info = new PatternBatchInfo();
+        info.slotTemplates = new IAEItemStack[inputs.length];
+
+        InventoryCrafting ic = new InventoryCrafting(new net.minecraft.inventory.Container() {
+            @Override
+            public boolean canInteractWith(net.minecraft.entity.player.EntityPlayer playerIn) {
+                return false;
+            }
+        }, 3, 3);
+
+        // SIMULATE 提取 1 份原料填充 InventoryCrafting
+        for (int i = 0; i < inputs.length && i < 9; i++) {
+            if (inputs[i] == null) continue;
+            IAEItemStack need = inputs[i].copy();
+            need.setStackSize(1);
+            IAEItemStack extracted = meInv.extractItems(need, appeng.api.config.Actionable.SIMULATE, source);
+            if (extracted != null) {
+                info.slotTemplates[i] = extracted.copy();
+                ic.setInventorySlotContents(i, extracted.createItemStack());
+            }
+        }
+
+        info.recipe = CraftingManager.findMatchingRecipe(ic, world);
+        if (info.recipe == null) {
+            patternBatchInfoCache.put(details, info); // 缓存 null recipe 避免重复查找
+            return info;
+        }
+
+        NonNullList<ItemStack> remaining = info.recipe.getRemainingItems(ic);
+        info.catalystSlots = new java.util.BitSet(inputs.length);
+        for (int i = 0; i < ic.getSizeInventory(); i++) {
+            ItemStack input = ic.getStackInSlot(i);
+            ItemStack rem = i < remaining.size() ? remaining.get(i) : ItemStack.EMPTY;
+            if (rem.isEmpty()) continue;
+            if (ItemStack.areItemsEqual(input, rem)
+                    && input.getMetadata() == rem.getMetadata()
+                    && Objects.equals(input.getTagCompound(), rem.getTagCompound())) {
+                info.catalystSlots.set(i);
+            }
+        }
+
+        patternBatchInfoCache.put(details, info);
+        return info;
+    }
+
+    /**
+     * 供 Mixin 调用：检查 pendingOutputs 是否还能接受指定数量的 stack。
+     */
+    public boolean canAcceptRealBatch(int stackCount) {
+        return pendingOutputs.size() + stackCount <= MAX_PENDING_OUTPUTS;
+    }
+
+    /**
+     * 供 Mixin 调用：安全地将产物加入 pendingOutputs。
+     */
+    public void addPendingOutput(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return;
+        if (pendingOutputs.size() >= MAX_PENDING_OUTPUTS) {
+            AE2Enhanced.LOGGER.error("[AE2E] pendingOutputs overflow, dropping {}", stack);
+            return;
+        }
+        pendingOutputs.add(stack);
     }
 
     // ---------- ICraftingProvider ----------

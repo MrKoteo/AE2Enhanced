@@ -11,6 +11,9 @@ import appeng.api.networking.energy.IEnergyGrid;
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface;
+import net.minecraft.inventory.InventoryCrafting;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.NonNullList;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -141,7 +144,129 @@ public class MixinCraftingCPUCluster {
                         anyOurTask = true;
 
                         TileAssemblyController controller = ((TileAssemblyMeInterface) medium).getController();
-                        if (controller == null || !controller.isVirtualPattern(details)) continue;
+                        if (controller == null) continue;
+
+                        // ---------- 真实合成 batch 分支 ----------
+                        if (!controller.isVirtualPattern(details)) {
+                            if (details.canSubstitute()) break;
+                            if (!controller.canBatch()) break;
+
+                            long cap = controller.getParallelCap();
+                            long batchSize = (cap >= Long.MAX_VALUE / 2) ? remaining : Math.min(remaining, cap);
+                            long actualBatchSize = batchSize;
+
+                            appeng.api.networking.security.IActionSource source = cpu.getActionSource();
+                            controller.setCurrentActionSource(source);
+                            try {
+                                appeng.crafting.MECraftingInventory meInv = (appeng.crafting.MECraftingInventory) cpu.getInventory();
+                                appeng.api.config.Actionable SIMULATE = appeng.api.config.Actionable.SIMULATE;
+                                appeng.api.config.Actionable MODULATE = appeng.api.config.Actionable.MODULATE;
+
+                                TileAssemblyController.PatternBatchInfo info = controller.getPatternBatchInfo(details, meInv, source);
+                                if (info == null || info.recipe == null) break;
+
+                                int estimatedStacks = 1;
+                                for (int i = 0; i < info.slotTemplates.length; i++) {
+                                    if (info.slotTemplates[i] != null && !info.catalystSlots.get(i)) {
+                                        estimatedStacks++;
+                                    }
+                                }
+                                if (!controller.canAcceptRealBatch(estimatedStacks)) break;
+
+                                boolean canExtract = true;
+                                for (int i = 0; i < info.slotTemplates.length; i++) {
+                                    if (info.slotTemplates[i] == null) continue;
+                                    long needCount = info.catalystSlots.get(i) ? 1 : actualBatchSize;
+                                    IAEItemStack need = info.slotTemplates[i].copy();
+                                    need.setStackSize(needCount);
+                                    IAEItemStack simResult = meInv.extractItems(need, SIMULATE, source);
+                                    if (simResult == null || simResult.getStackSize() < needCount) {
+                                        if (info.catalystSlots.get(i)) {
+                                            canExtract = false;
+                                        } else {
+                                            actualBatchSize = Math.min(actualBatchSize,
+                                                simResult != null ? simResult.getStackSize() : 0);
+                                        }
+                                    }
+                                }
+                                if (!canExtract || actualBatchSize <= 0) break;
+
+                                for (int i = 0; i < info.slotTemplates.length; i++) {
+                                    if (info.slotTemplates[i] == null) continue;
+                                    long needCount = info.catalystSlots.get(i) ? 1 : actualBatchSize;
+                                    IAEItemStack need = info.slotTemplates[i].copy();
+                                    need.setStackSize(needCount);
+                                    IAEItemStack extracted = meInv.extractItems(need, MODULATE, source);
+                                    if (extracted != null && extracted.getStackSize() > 0) {
+                                        IAEItemStack diff = extracted.copy();
+                                        diff.setStackSize(-diff.getStackSize());
+                                        postChange.invoke(cpu, diff, source);
+                                        postCraftingStatusChange.invoke(cpu, diff);
+                                    }
+                                }
+
+                                InventoryCrafting ic = new InventoryCrafting(new net.minecraft.inventory.Container() {
+                                    @Override
+                                    public boolean canInteractWith(net.minecraft.entity.player.EntityPlayer playerIn) {
+                                        return false;
+                                    }
+                                }, 3, 3);
+                                for (int i = 0; i < info.slotTemplates.length; i++) {
+                                    if (info.slotTemplates[i] == null) continue;
+                                    ItemStack stack = info.slotTemplates[i].createItemStack();
+                                    stack.setCount(1);
+                                    ic.setInventorySlotContents(i, stack);
+                                }
+
+                                ItemStack output = info.recipe.getCraftingResult(ic);
+                                NonNullList<ItemStack> recipeRemaining = info.recipe.getRemainingItems(ic);
+
+                                if (!output.isEmpty()) {
+                                    ItemStack batchOutput = output.copy();
+                                    batchOutput.setCount(output.getCount() * (int) actualBatchSize);
+                                    controller.addPendingOutput(batchOutput);
+                                }
+
+                                for (int i = 0; i < recipeRemaining.size(); i++) {
+                                    ItemStack rem = recipeRemaining.get(i);
+                                    if (rem.isEmpty()) continue;
+                                    if (info.catalystSlots.get(i)) {
+                                        controller.addPendingOutput(rem.copy());
+                                    } else {
+                                        ItemStack batchRem = rem.copy();
+                                        batchRem.setCount(rem.getCount() * (int) actualBatchSize);
+                                        controller.addPendingOutput(batchRem);
+                                    }
+                                }
+
+                                long newRemaining = remaining - actualBatchSize;
+                                taskProgressValueField.setLong(progress, newRemaining);
+
+                                // 同步 remainingOperations 和 remainingItemCount，确保 AE2 预提取逻辑继续补充原料
+                                long oldRemOps = remOpsField.getLong(cpu);
+                                remOpsField.setLong(cpu, oldRemOps - actualBatchSize);
+                                long oldRemItemCount = remItemCountField.getLong(cpu);
+                                long totalOutputCount = 0;
+                                for (IAEItemStack out : details.getCondensedOutputs()) {
+                                    if (out != null) totalOutputCount += out.getStackSize() * actualBatchSize;
+                                }
+                                remItemCountField.setLong(cpu, oldRemItemCount - totalOutputCount);
+
+                                controller.setBatchBusy(true);
+                                changed = true;
+                                controller.resetBatchCooldown();
+
+                                AE2Enhanced.LOGGER.info("[AE2E Batch] Processed {}x real {} -> remaining={}",
+                                    actualBatchSize, details.getOutput(null, null).getDisplayName(), newRemaining);
+                            } catch (Exception e) {
+                                AE2Enhanced.LOGGER.error("[AE2E] Real batch error: {}", e.toString());
+                            } finally {
+                                controller.setCurrentActionSource(null);
+                            }
+                            break;
+                        }
+
+                        // ---------- 虚拟合成 batch 分支（原有逻辑）----------
 
                         // 速度升级冷却检查：冷却未结束则跳过，留给下次 tick
                         if (!controller.canBatch()) continue;
