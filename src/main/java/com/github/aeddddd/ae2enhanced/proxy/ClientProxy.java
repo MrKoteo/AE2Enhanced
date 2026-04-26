@@ -57,7 +57,8 @@ public class ClientProxy extends CommonProxy {
             new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card", "inventory"),
             new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_parallel", "inventory"),
             new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_speed", "inventory"),
-            new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_capacity", "inventory")
+            new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_capacity", "inventory"),
+            new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_upload", "inventory")
         );
 
         // 新材料物品模型
@@ -75,6 +76,8 @@ public class ClientProxy extends CommonProxy {
                     return new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_speed", "inventory");
                 case ItemUpgradeCard.META_CAPACITY:
                     return new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_capacity", "inventory");
+                case ItemUpgradeCard.META_RESERVED1:
+                    return new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card_upload", "inventory");
                 default:
                     return new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card", "inventory");
             }
