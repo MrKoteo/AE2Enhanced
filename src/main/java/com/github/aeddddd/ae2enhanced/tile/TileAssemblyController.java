@@ -285,6 +285,56 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     }
 
     /**
+     * 检查是否安装了样板自动上传模块升级（META_RESERVED1，槽位 4）。
+     */
+    public boolean hasAutoUploadUpgrade() {
+        ItemStack stack = itemHandler.getStackInSlot(ItemUpgradeCard.META_RESERVED1);
+        return !stack.isEmpty() && stack.getItem() instanceof ItemUpgradeCard
+                && stack.getMetadata() == ItemUpgradeCard.META_RESERVED1;
+    }
+
+    /**
+     * 检查控制器是否能接受指定样板（不重复且有空位）。
+     */
+    public boolean canAcceptPattern(ItemStack pattern) {
+        if (world == null || world.isRemote || !formed) return false;
+        int patternSlots = getPatternSlotCount();
+        for (int i = UPGRADE_SLOTS; i < UPGRADE_SLOTS + patternSlots; i++) {
+            ItemStack existing = itemHandler.getStackInSlot(i);
+            if (existing.isEmpty()) {
+                return true; // 有空位
+            }
+            if (ItemStack.areItemsEqual(existing, pattern)
+                    && java.util.Objects.equals(existing.getTagCompound(), pattern.getTagCompound())) {
+                return false; // 重复
+            }
+        }
+        return false; // 满且无空位
+    }
+
+    /**
+     * 尝试将样板自动上传到本控制器的第一个空样板槽位。
+     * 上传成功后触发 patternsDirty 通知 AE2 网络重新扫描。
+     * @return true 如果上传成功
+     */
+    public boolean tryAutoUploadPattern(ItemStack pattern) {
+        if (world == null || world.isRemote || !formed || pattern.isEmpty()) return false;
+        int patternSlots = getPatternSlotCount();
+        for (int i = UPGRADE_SLOTS; i < UPGRADE_SLOTS + patternSlots; i++) {
+            if (itemHandler.getStackInSlot(i).isEmpty()) {
+                itemHandler.setStackInSlot(i, pattern.copy());
+                patternsDirty = true;
+                markDirty();
+                if (world != null && !world.isRemote) {
+                    world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 检查扩容升级能否减少到 newCapacityCount 张。
      * 如果被移除的扩展页面中任意槽位留有样板，返回 false。
      */
