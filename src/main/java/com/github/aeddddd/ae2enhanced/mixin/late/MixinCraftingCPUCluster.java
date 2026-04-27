@@ -46,6 +46,41 @@ public class MixinCraftingCPUCluster {
     private static int batchSuccessCount = 0;
     private static int batchFailCount = 0;
 
+    /**
+     * 从 CraftingCPUCluster 关联的网络存储中提取指定物品，用于 batch 运行时补充 inventory 中不足的原料。
+     */
+    private static appeng.api.storage.data.IAEItemStack fetchFromNetwork(
+            CraftingCPUCluster cpu,
+            appeng.api.storage.data.IAEItemStack request,
+            appeng.api.networking.security.IActionSource source) {
+        try {
+            appeng.api.networking.security.IActionSource src = cpu.getActionSource();
+            if (src instanceof appeng.me.helpers.MachineSource) {
+                java.util.Optional<appeng.api.networking.security.IActionHost> hostOpt =
+                    ((appeng.me.helpers.MachineSource) src).machine();
+                if (hostOpt.isPresent()) {
+                    appeng.api.networking.IGridNode node = hostOpt.get().getActionableNode();
+                    if (node != null) {
+                        appeng.api.networking.IGrid grid = node.getGrid();
+                        if (grid != null) {
+                            appeng.api.networking.storage.IStorageGrid sg =
+                                grid.getCache(appeng.api.networking.storage.IStorageGrid.class);
+                            appeng.api.storage.channels.IItemStorageChannel channel =
+                                appeng.api.AEApi.instance().storage().getStorageChannel(
+                                    appeng.api.storage.channels.IItemStorageChannel.class);
+                            appeng.api.storage.IMEMonitor<appeng.api.storage.data.IAEItemStack> storage =
+                                sg.getInventory(channel);
+                            return storage.extractItems(request, appeng.api.config.Actionable.MODULATE, source);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            AE2Enhanced.LOGGER.error("[AE2E] fetchFromNetwork failed: {}", e.toString());
+        }
+        return null;
+    }
+
     private static void tryInitReflection() {
         if (reflectionReady || reflectionFailed) return;
         try {
@@ -201,10 +236,35 @@ public class MixinCraftingCPUCluster {
                                     IAEItemStack simResult = meInv.extractItems(need, SIMULATE, source);
                                     if (simResult == null || simResult.getStackSize() < needCount) {
                                         if (info.catalystSlots.get(i) || info.transformSlots.get(i)) {
-                                            canExtract = false;
+                                            // 催化剂/转换物品不足：尝试从网络补充 1 份到 inventory
+                                            IAEItemStack toFetch = info.slotTemplates[i].copy();
+                                            toFetch.setStackSize(1);
+                                            IAEItemStack fetched = fetchFromNetwork(cpu, toFetch, source);
+                                            if (fetched != null && fetched.getStackSize() > 0) {
+                                                meInv.injectItems(fetched, MODULATE, source);
+                                                // 重新检查
+                                                simResult = meInv.extractItems(need, SIMULATE, source);
+                                                if (simResult == null || simResult.getStackSize() < needCount) {
+                                                    canExtract = false;
+                                                }
+                                            } else {
+                                                canExtract = false;
+                                            }
                                         } else {
-                                            actualBatchSize = Math.min(actualBatchSize,
-                                                simResult != null ? simResult.getStackSize() : 0);
+                                            // 普通原料不足：尝试从网络补充差额到 inventory
+                                            long missing = needCount - (simResult != null ? simResult.getStackSize() : 0);
+                                            IAEItemStack toFetch = info.slotTemplates[i].copy();
+                                            toFetch.setStackSize(missing);
+                                            IAEItemStack fetched = fetchFromNetwork(cpu, toFetch, source);
+                                            if (fetched != null && fetched.getStackSize() > 0) {
+                                                meInv.injectItems(fetched, MODULATE, source);
+                                                long nowAvailable = (simResult != null ? simResult.getStackSize() : 0)
+                                                    + fetched.getStackSize();
+                                                actualBatchSize = Math.min(actualBatchSize, nowAvailable);
+                                            } else {
+                                                actualBatchSize = Math.min(actualBatchSize,
+                                                    simResult != null ? simResult.getStackSize() : 0);
+                                            }
                                         }
                                     }
                                 }
@@ -255,7 +315,10 @@ public class MixinCraftingCPUCluster {
                                     ItemStack rem = recipeRemaining.get(i);
                                     if (rem.isEmpty()) continue;
                                     if (info.catalystSlots.get(i)) {
-                                        controller.addPendingOutput(rem.copy());
+                                        // 催化剂不消耗，直接返还到 CPU inventory，确保下一批 batch 仍有催化剂可用
+                                        IAEItemStack catalystReturn = info.slotTemplates[i].copy();
+                                        catalystReturn.setStackSize(1);
+                                        meInv.injectItems(catalystReturn, MODULATE, source);
                                     } else {
                                         ItemStack batchRem = rem.copy();
                                         batchRem.setCount(rem.getCount() * (int) actualBatchSize);

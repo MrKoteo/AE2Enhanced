@@ -247,6 +247,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
      * 粒子沿切向运动并螺旋向内，颜色为偏紫的随机色调。
      */
     private void spawnBlackHoleParticles() {
+        if (world == null || !(world.getBlockState(pos).getBlock() instanceof BlockAssemblyController)) return;
         EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
         BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
         double cx = origin.getX() + 0.5;
@@ -431,6 +432,11 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
     @Override
     @Nonnull
     public AxisAlignedBB getRenderBoundingBox() {
+        if (world == null) return super.getRenderBoundingBox();
+        // 防御性检查：TileEntity 可能残留但 Block 已被移除（如死亡重生时区块加载异常）
+        if (!(world.getBlockState(pos).getBlock() instanceof BlockAssemblyController)) {
+            return super.getRenderBoundingBox();
+        }
         EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
         BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
         return new AxisAlignedBB(
@@ -453,6 +459,7 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
 
         // 黑洞事件视界：秒杀进入中心区域的生物；16次未死则放逐至随机维度
         if (formed) {
+            if (!(world.getBlockState(pos).getBlock() instanceof BlockAssemblyController)) return;
             EnumFacing controllerFacing = world.getBlockState(pos).getValue(BlockAssemblyController.FACING);
             BlockPos origin = AssemblyStructure.getOriginFromController(pos, controllerFacing);
             AxisAlignedBB eventHorizon = new AxisAlignedBB(
@@ -955,6 +962,16 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
      * 首次调用时从 MECraftingInventory SIMULATE 提取 1 份原料构造 InventoryCrafting，
      * 执行 getRemainingItems() 识别催化剂槽位（remaining 与 input 完全一致）。
      */
+    /**
+     * 宽松比较两个 NBT：null 与空 tag 视为等价。
+     */
+    private static boolean areNbtEquivalent(@Nullable NBTTagCompound a, @Nullable NBTTagCompound b) {
+        if (Objects.equals(a, b)) return true;
+        if (a == null) return b == null || b.getKeySet().isEmpty();
+        if (b == null) return a.getKeySet().isEmpty();
+        return false;
+    }
+
     public PatternBatchInfo getPatternBatchInfo(ICraftingPatternDetails details,
                                                  appeng.crafting.MECraftingInventory meInv,
                                                  appeng.api.networking.security.IActionSource source) {
@@ -1000,8 +1017,16 @@ public class TileAssemblyController extends TileEntity implements ICraftingProvi
             ItemStack rem = i < remaining.size() ? remaining.get(i) : ItemStack.EMPTY;
             if (rem.isEmpty()) continue;
             if (ItemStack.areItemsEqual(input, rem) && input.getMetadata() == rem.getMetadata()) {
-                if (Objects.equals(input.getTagCompound(), rem.getTagCompound())) {
+                if (areNbtEquivalent(input.getTagCompound(), rem.getTagCompound())) {
                     info.catalystSlots.set(i); // 真催化剂：NBT 完全不变
+                } else if (!input.isItemStackDamageable()) {
+                    // 不可损坏物品（如神秘农业终极注魔水晶）：getRemainingItems 返回的 NBT 可能有差异，
+                    // 但物品本身在合成中无损耗，应视为催化剂而非消耗性转换
+                    info.catalystSlots.set(i);
+                } else if (input.getItem().hasContainerItem(input)
+                    && ItemStack.areItemStacksEqual(input.getItem().getContainerItem(input), rem)) {
+                    // getContainerItem 明确返回同一物品：视为催化剂（处理某些 mod 的 getRemainingItems 实现）
+                    info.catalystSlots.set(i);
                 } else {
                     info.transformSlots.set(i); // 消耗性转换：同一物品但 NBT 变化（耐久、能量等）
                 }
