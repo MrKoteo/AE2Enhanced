@@ -531,11 +531,6 @@ public class AssemblyStructure {
                 if (te instanceof com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface) {
                     com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface me = (com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface) te;
                     me.setControllerPos(formed ? controllerPos : null);
-                    if (formed) {
-                        me.getProxy().onReady();
-                    } else {
-                        me.getProxy().invalidate();
-                    }
                 }
             }
         }

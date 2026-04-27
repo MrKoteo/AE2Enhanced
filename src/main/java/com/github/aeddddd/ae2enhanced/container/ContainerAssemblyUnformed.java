@@ -10,7 +10,7 @@ import net.minecraft.item.ItemStack;
 public class ContainerAssemblyUnformed extends Container {
 
     private static final int INV_X = 59;
-    private static final int INV_Y = 158;
+    private static final int INV_Y = 270;
 
     private final TileAssemblyController tile;
 
