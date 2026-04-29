@@ -1,0 +1,157 @@
+package com.github.aeddddd.ae2enhanced.storage;
+
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.world.World;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 超维度仓储中枢的外部文件持久化层。
+ * 每个结构对应一个独立文件，数据不写入 NBT/WorldSavedData。
+ *
+ * 文件格式（压缩 NBT）：
+ * {
+ *   version: 1 (int)
+ *   nexusId: UUID (long[])
+ *   items: NBTTagList {
+ *     { id: "modid:item", Damage: 0s, Count: "12345678901234567890", tag?: NBTTagCompound }
+ *   }
+ * }
+ */
+public class HyperdimensionalStorageFile {
+
+    public static final int CURRENT_VERSION = 1;
+
+    private final File file;
+    private final UUID nexusId;
+    private final ScheduledExecutorService executor;
+    private volatile boolean dirty = false;
+    private volatile boolean closed = false;
+
+    public HyperdimensionalStorageFile(World world, UUID nexusId) {
+        this.nexusId = nexusId;
+        File worldDir = world.getSaveHandler().getWorldDirectory();
+        File storageDir = new File(worldDir, "ae2enhanced/storage");
+        if (!storageDir.exists()) {
+            storageDir.mkdirs();
+        }
+        this.file = new File(storageDir, nexusId.toString() + ".dat");
+        this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "AE2E-Storage-" + nexusId.toString().substring(0, 8));
+            t.setDaemon(true);
+            return t;
+        });
+        this.executor.scheduleWithFixedDelay(this::flush, 5, 5, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 从文件加载数据到目标 Map。若文件不存在则不做任何事（空存储）。
+     */
+    public void load(Map<ItemDescriptor, BigInteger> target) {
+        if (!file.exists()) return;
+        try {
+            NBTTagCompound root = CompressedStreamTools.read(file);
+            if (root == null) return;
+            int version = root.getInteger("version");
+            if (version > CURRENT_VERSION) {
+                // 未来版本：尝试兼容读取或报错
+                com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.warn(
+                    "[AE2E] Storage file version {} > current {}. Attempting best-effort load.", version, CURRENT_VERSION);
+            }
+            NBTTagList items = root.getTagList("items", 10);
+            for (int i = 0; i < items.tagCount(); i++) {
+                NBTTagCompound tag = items.getCompoundTagAt(i);
+                ItemDescriptor descriptor = ItemDescriptor.fromNBT(tag);
+                if (descriptor == null) continue;
+                String countStr = tag.getString("Count");
+                BigInteger count;
+                try {
+                    count = new BigInteger(countStr);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                target.put(descriptor, count);
+            }
+        } catch (IOException e) {
+            com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
+                "[AE2E] Failed to load storage file: {}", file.getAbsolutePath(), e);
+        }
+    }
+
+    /**
+     * 将当前内存数据保存到文件。
+     */
+    public void save(Map<ItemDescriptor, BigInteger> source) {
+        NBTTagCompound root = new NBTTagCompound();
+        root.setInteger("version", CURRENT_VERSION);
+        root.setUniqueId("nexusId", nexusId);
+        NBTTagList items = new NBTTagList();
+        for (Map.Entry<ItemDescriptor, BigInteger> entry : source.entrySet()) {
+            NBTTagCompound tag = entry.getKey().toNBT();
+            tag.setString("Count", entry.getValue().toString());
+            items.appendTag(tag);
+        }
+        root.setTag("items", items);
+
+        File tmpFile = new File(file.getAbsolutePath() + ".tmp");
+        try {
+            CompressedStreamTools.write(root, tmpFile);
+            if (file.exists() && !file.delete()) {
+                throw new IOException("Failed to delete old storage file");
+            }
+            if (!tmpFile.renameTo(file)) {
+                throw new IOException("Failed to rename temp file to storage file");
+            }
+        } catch (IOException e) {
+            com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
+                "[AE2E] Failed to save storage file: {}", file.getAbsolutePath(), e);
+        }
+    }
+
+    public void markDirty() {
+        this.dirty = true;
+    }
+
+    private void flush() {
+        if (!dirty || closed) return;
+        // 由外部传入当前数据快照
+        dirty = false;
+    }
+
+    /**
+     * 关闭文件句柄，强制刷盘一次。
+     */
+    public void close(Map<ItemDescriptor, BigInteger> finalSnapshot) {
+        if (closed) return;
+        closed = true;
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        if (finalSnapshot != null) {
+            save(finalSnapshot);
+        }
+    }
+
+    public boolean isClosed() {
+        return closed;
+    }
+
+    public UUID getNexusId() {
+        return nexusId;
+    }
+}

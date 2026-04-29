@@ -1,6 +1,7 @@
 package com.github.aeddddd.ae2enhanced.block;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.gui.GuiHandler;
 import com.github.aeddddd.ae2enhanced.structure.ControllerIndex;
 import com.github.aeddddd.ae2enhanced.structure.HyperdimensionalStructure;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
@@ -91,7 +92,12 @@ public class BlockHyperdimensionalController extends Block {
     @Override
     public boolean onBlockActivated(World world, BlockPos pos, IBlockState state, EntityPlayer player, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
         if (player.isSneaking()) return false;
-        // P0 阶段暂不打开 GUI，后续补充信息面板
+        if (!world.isRemote) {
+            TileEntity te = world.getTileEntity(pos);
+            if (te instanceof TileHyperdimensionalController) {
+                player.openGui(AE2Enhanced.instance, GuiHandler.GUI_HYPERDIMENSIONAL_NEXUS, world, pos.getX(), pos.getY(), pos.getZ());
+            }
+        }
         return true;
     }
 }

@@ -1,0 +1,115 @@
+package com.github.aeddddd.ae2enhanced.storage;
+
+import appeng.api.AEApi;
+import appeng.api.config.Actionable;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.storage.IMEInventory;
+import appeng.api.storage.IStorageChannel;
+import appeng.api.storage.channels.IItemStorageChannel;
+import appeng.api.storage.data.IAEItemStack;
+import appeng.api.storage.data.IItemList;
+import net.minecraft.item.ItemStack;
+
+import java.math.BigInteger;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 物品存储适配器，实现 AE2 的 IMEInventory 接口。
+ * 内部使用 BigInteger 维护数量，突破 long 上限。
+ */
+public class ItemStorageAdapter implements IMEInventory<IAEItemStack> {
+
+    private final Map<ItemDescriptor, BigInteger> storage = new ConcurrentHashMap<>();
+    private final IItemStorageChannel channel;
+    private final HyperdimensionalStorageFile file;
+
+    public ItemStorageAdapter(HyperdimensionalStorageFile file) {
+        this.channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
+        this.file = file;
+        file.load(storage);
+    }
+
+    public Map<ItemDescriptor, BigInteger> getStorageMap() {
+        return storage;
+    }
+
+    @Override
+    public IAEItemStack injectItems(IAEItemStack input, Actionable type, IActionSource src) {
+        if (input == null || input.getStackSize() <= 0) return null;
+        ItemStack itemStack = input.createItemStack();
+        ItemDescriptor key = new ItemDescriptor(itemStack);
+        BigInteger amount = BigInteger.valueOf(input.getStackSize());
+
+        if (type == Actionable.MODULATE) {
+            storage.merge(key, amount, BigInteger::add);
+            file.markDirty();
+            return null; // 无限容量，全部接受
+        }
+        // SIMULATE: 无限容量，全部接受
+        return null;
+    }
+
+    @Override
+    public IAEItemStack extractItems(IAEItemStack request, Actionable type, IActionSource src) {
+        if (request == null || request.getStackSize() <= 0) return null;
+        ItemStack itemStack = request.createItemStack();
+        ItemDescriptor key = new ItemDescriptor(itemStack);
+        BigInteger available = storage.getOrDefault(key, BigInteger.ZERO);
+        BigInteger requested = BigInteger.valueOf(request.getStackSize());
+        BigInteger toExtract = available.min(requested);
+
+        if (toExtract.signum() <= 0) {
+            return request.copy(); // 无法提取任何，返回原请求
+        }
+
+        if (type == Actionable.MODULATE) {
+            BigInteger remaining = available.subtract(toExtract);
+            if (remaining.signum() <= 0) {
+                storage.remove(key);
+            } else {
+                storage.put(key, remaining);
+            }
+            file.markDirty();
+        }
+
+        IAEItemStack result = channel.createStack(itemStack);
+        if (result == null) return null;
+
+        // BigInteger -> long 分片：若超过 Long.MAX_VALUE，本次只提取 Long.MAX_VALUE
+        if (toExtract.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0) {
+            result.setStackSize(Long.MAX_VALUE);
+        } else {
+            result.setStackSize(toExtract.longValueExact());
+        }
+        return result;
+    }
+
+    @Override
+    public IItemList<IAEItemStack> getAvailableItems(IItemList<IAEItemStack> out) {
+        for (Map.Entry<ItemDescriptor, BigInteger> entry : storage.entrySet()) {
+            ItemDescriptor desc = entry.getKey();
+            ItemStack stack = desc.toItemStack();
+            IAEItemStack aeStack = channel.createStack(stack);
+            if (aeStack == null) continue;
+
+            BigInteger count = entry.getValue();
+            if (count.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0) {
+                aeStack.setStackSize(Long.MAX_VALUE);
+            } else {
+                aeStack.setStackSize(count.longValue());
+            }
+            out.addStorage(aeStack);
+        }
+        return out;
+    }
+
+    @Override
+    public IStorageChannel<IAEItemStack> getChannel() {
+        return channel;
+    }
+
+    public HyperdimensionalStorageFile getFile() {
+        return file;
+    }
+}

@@ -1,10 +1,28 @@
 package com.github.aeddddd.ae2enhanced.tile;
 
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.storage.IStorageMonitorable;
+import appeng.api.storage.IStorageMonitorableAccessor;
+import appeng.api.util.AECableType;
+import appeng.api.util.AEPartLocation;
+import appeng.api.util.DimensionalCoord;
+import appeng.me.helpers.AENetworkProxy;
+import appeng.me.helpers.IGridProxyable;
+import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.block.BlockHyperdimensionalMeInterface;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 
-public class TileHyperdimensionalMeInterface extends TileEntity {
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * 仓储中枢 ME 接口，仅作为 AE 网络物理接入点。
+ * 所有网络逻辑（包括存储暴露）委托给控制器。
+ */
+public class TileHyperdimensionalMeInterface extends TileEntity implements IGridProxyable {
 
     private BlockPos controllerPos = null;
 
@@ -17,11 +35,81 @@ public class TileHyperdimensionalMeInterface extends TileEntity {
         return controllerPos;
     }
 
+    public TileHyperdimensionalController getController() {
+        if (controllerPos == null || world == null) return null;
+        TileEntity te = world.getTileEntity(controllerPos);
+        return te instanceof TileHyperdimensionalController ? (TileHyperdimensionalController) te : null;
+    }
+
+    // ---- IGridProxyable / IGridHost ----
+
+    @Override
+    public AENetworkProxy getProxy() {
+        TileHyperdimensionalController controller = getController();
+        if (controller != null) {
+            return controller.getProxy();
+        }
+        return null;
+    }
+
+    @Override
+    public DimensionalCoord getLocation() {
+        return new DimensionalCoord(this);
+    }
+
+    @Override
+    public void gridChanged() {
+    }
+
+    @Override
+    public IGridNode getGridNode(@Nonnull AEPartLocation dir) {
+        if (controllerPos == null || world == null) return null;
+        TileEntity te = world.getTileEntity(controllerPos);
+        if (te instanceof TileHyperdimensionalController) {
+            TileHyperdimensionalController controller = (TileHyperdimensionalController) te;
+            if (controller.isFormed()) {
+                AENetworkProxy proxy = controller.getProxy();
+                if (proxy != null) {
+                    return proxy.getNode();
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nonnull
+    @Override
+    public AECableType getCableConnectionType(@Nonnull AEPartLocation dir) {
+        if (controllerPos == null || world == null) return AECableType.NONE;
+        TileEntity te = world.getTileEntity(controllerPos);
+        if (te instanceof TileHyperdimensionalController) {
+            TileHyperdimensionalController controller = (TileHyperdimensionalController) te;
+            if (controller.isFormed()) {
+                return AECableType.SMART;
+            }
+        }
+        return AECableType.NONE;
+    }
+
+    @Override
+    public void securityBreak() {
+        if (controllerPos != null && world != null) {
+            TileEntity te = world.getTileEntity(controllerPos);
+            if (te instanceof TileHyperdimensionalController) {
+                ((TileHyperdimensionalController) te).disassemble();
+            }
+        }
+    }
+
     @Override
     public void readFromNBT(NBTTagCompound compound) {
         super.readFromNBT(compound);
         if (compound.hasKey("controllerX")) {
-            controllerPos = new BlockPos(compound.getInteger("controllerX"), compound.getInteger("controllerY"), compound.getInteger("controllerZ"));
+            controllerPos = new BlockPos(
+                compound.getInteger("controllerX"),
+                compound.getInteger("controllerY"),
+                compound.getInteger("controllerZ")
+            );
         }
     }
 

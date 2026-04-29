@@ -4,6 +4,7 @@ import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyFormed;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyPattern;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyUnformed;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
+import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
@@ -14,6 +15,7 @@ public class GuiHandler implements IGuiHandler {
 
     public static final int GUI_ASSEMBLY_CONTROLLER = 0;
     public static final int GUI_ASSEMBLY_PATTERN = 1;
+    public static final int GUI_HYPERDIMENSIONAL_NEXUS = 2;
 
     /** 编码页码到 GUI ID：低4位为 base ID，bit8-15为页码，bit16-20为 patternPages */
     public static int encodePatternId(int page, int patternPages) {
@@ -33,19 +35,23 @@ public class GuiHandler implements IGuiHandler {
     @Override
     public Object getServerGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
         TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
-        if (!(te instanceof TileAssemblyController)) return null;
-        TileAssemblyController tile = (TileAssemblyController) te;
-        int baseId = ID & 0xF;
-        if (baseId == GUI_ASSEMBLY_CONTROLLER) {
-            if (tile.isFormed()) {
-                return new ContainerAssemblyFormed(player.inventory, tile);
-            } else {
-                return new ContainerAssemblyUnformed(player.inventory, tile);
+        if (te instanceof TileAssemblyController) {
+            TileAssemblyController tile = (TileAssemblyController) te;
+            int baseId = ID & 0xF;
+            if (baseId == GUI_ASSEMBLY_CONTROLLER) {
+                if (tile.isFormed()) {
+                    return new ContainerAssemblyFormed(player.inventory, tile);
+                } else {
+                    return new ContainerAssemblyUnformed(player.inventory, tile);
+                }
+            } else if (baseId == GUI_ASSEMBLY_PATTERN) {
+                int page = decodePatternPage(ID);
+                int patternPages = decodePatternPages(ID);
+                return new ContainerAssemblyPattern(player.inventory, tile, page, patternPages);
             }
-        } else if (baseId == GUI_ASSEMBLY_PATTERN) {
-            int page = decodePatternPage(ID);
-            int patternPages = decodePatternPages(ID);
-            return new ContainerAssemblyPattern(player.inventory, tile, page, patternPages);
+        } else if (te instanceof TileHyperdimensionalController) {
+            // 信息面板不需要服务器端 Container
+            return null;
         }
         return null;
     }
@@ -53,19 +59,24 @@ public class GuiHandler implements IGuiHandler {
     @Override
     public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
         TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
-        if (!(te instanceof TileAssemblyController)) return null;
-        TileAssemblyController tile = (TileAssemblyController) te;
-        int baseId = ID & 0xF;
-        if (baseId == GUI_ASSEMBLY_CONTROLLER) {
-            if (tile.isFormed()) {
-                return new GuiAssemblyFormed(player.inventory, tile);
-            } else {
-                return new GuiAssemblyUnformed(player.inventory, tile);
+        if (te instanceof TileAssemblyController) {
+            TileAssemblyController tile = (TileAssemblyController) te;
+            int baseId = ID & 0xF;
+            if (baseId == GUI_ASSEMBLY_CONTROLLER) {
+                if (tile.isFormed()) {
+                    return new GuiAssemblyFormed(player.inventory, tile);
+                } else {
+                    return new GuiAssemblyUnformed(player.inventory, tile);
+                }
+            } else if (baseId == GUI_ASSEMBLY_PATTERN) {
+                int page = decodePatternPage(ID);
+                int patternPages = decodePatternPages(ID);
+                return new GuiAssemblyPattern(player.inventory, tile, page, patternPages);
             }
-        } else if (baseId == GUI_ASSEMBLY_PATTERN) {
-            int page = decodePatternPage(ID);
-            int patternPages = decodePatternPages(ID);
-            return new GuiAssemblyPattern(player.inventory, tile, page, patternPages);
+        } else if (te instanceof TileHyperdimensionalController) {
+            if (ID == GUI_HYPERDIMENSIONAL_NEXUS) {
+                return new GuiHyperdimensionalNexus((TileHyperdimensionalController) te);
+            }
         }
         return null;
     }
