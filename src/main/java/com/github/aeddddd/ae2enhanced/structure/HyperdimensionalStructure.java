@@ -174,4 +174,91 @@ public class HyperdimensionalStructure {
         }
         return EnumFacing.NORTH;
     }
+
+    /**
+     * 创造模式：一键生成所有缺失方块
+     */
+    public static void placeMissingBlocks(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
+        if (world.isRemote) return;
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+
+        placeBlocks(world, controllerPos, ME_INTERFACE_SET, ModBlocks.HYPERDIMENSIONAL_ME_INTERFACE, facing);
+        placeBlocks(world, controllerPos, CORE_SET, ModBlocks.HYPERDIMENSIONAL_SINGULARITY_CORE, facing);
+        placeBlocks(world, controllerPos, CASING_SET, ModBlocks.HYPERDIMENSIONAL_CASING, facing);
+
+        // 立即触发组装（跳过 20 tick 等待）
+        assemble(world, controllerPos);
+    }
+
+    private static void placeBlocks(World world, BlockPos controllerPos, Set<BlockPos> set, Block block, EnumFacing facing) {
+        for (BlockPos rel : set) {
+            BlockPos pos = controllerPos.add(rotate(rel, facing));
+            if (world.getBlockState(pos).getBlock() != block) {
+                world.setBlockState(pos, block.getDefaultState());
+            }
+        }
+    }
+
+    /**
+     * 生存模式：检查背包材料，足够则扣除并放置
+     * @return 是否成功
+     */
+    public static boolean tryConsumeAndPlace(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
+        if (world.isRemote) return false;
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+
+        Map<Block, Integer> missing = new LinkedHashMap<>();
+        countMissing(world, controllerPos, ME_INTERFACE_SET, ModBlocks.HYPERDIMENSIONAL_ME_INTERFACE, missing, facing);
+        countMissing(world, controllerPos, CORE_SET, ModBlocks.HYPERDIMENSIONAL_SINGULARITY_CORE, missing, facing);
+        countMissing(world, controllerPos, CASING_SET, ModBlocks.HYPERDIMENSIONAL_CASING, missing, facing);
+
+        if (missing.isEmpty()) {
+            assemble(world, controllerPos);
+            return true;
+        }
+
+        // 检查背包是否有足够材料
+        net.minecraft.entity.player.InventoryPlayer inv = player.inventory;
+        Map<Block, Integer> needed = new LinkedHashMap<>(missing);
+
+        for (net.minecraft.item.ItemStack stack : inv.mainInventory) {
+            if (stack.isEmpty()) continue;
+            for (Map.Entry<Block, Integer> entry : needed.entrySet()) {
+                Block block = entry.getKey();
+                if (stack.getItem() == net.minecraft.item.Item.getItemFromBlock(block)) {
+                    int need = entry.getValue();
+                    int have = stack.getCount();
+                    if (have >= need) {
+                        entry.setValue(0);
+                    } else {
+                        entry.setValue(need - have);
+                    }
+                    break;
+                }
+            }
+        }
+
+        for (int count : needed.values()) {
+            if (count > 0) return false; // 材料不足
+        }
+
+        // 扣除材料
+        for (Map.Entry<Block, Integer> entry : missing.entrySet()) {
+            Block block = entry.getKey();
+            int remaining = entry.getValue();
+            net.minecraft.item.Item item = net.minecraft.item.Item.getItemFromBlock(block);
+            for (int i = 0; i < inv.mainInventory.size() && remaining > 0; i++) {
+                net.minecraft.item.ItemStack stack = inv.mainInventory.get(i);
+                if (stack.getItem() == item) {
+                    int take = Math.min(stack.getCount(), remaining);
+                    int removed = inv.decrStackSize(i, take).getCount();
+                    remaining -= removed;
+                }
+            }
+        }
+
+        // 放置方块
+        placeMissingBlocks(world, controllerPos, player);
+        return true;
+    }
 }

@@ -95,7 +95,12 @@ public class BlockHyperdimensionalController extends Block {
         if (!world.isRemote) {
             TileEntity te = world.getTileEntity(pos);
             if (te instanceof TileHyperdimensionalController) {
-                player.openGui(AE2Enhanced.instance, GuiHandler.GUI_HYPERDIMENSIONAL_NEXUS, world, pos.getX(), pos.getY(), pos.getZ());
+                TileHyperdimensionalController tile = (TileHyperdimensionalController) te;
+                if (tile.isFormed()) {
+                    player.openGui(AE2Enhanced.instance, GuiHandler.GUI_HYPERDIMENSIONAL_NEXUS, world, pos.getX(), pos.getY(), pos.getZ());
+                } else {
+                    player.openGui(AE2Enhanced.instance, GuiHandler.GUI_HYPERDIMENSIONAL_UNFORMED, world, pos.getX(), pos.getY(), pos.getZ());
+                }
             }
         }
         return true;

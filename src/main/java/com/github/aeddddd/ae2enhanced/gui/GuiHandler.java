@@ -3,6 +3,7 @@ package com.github.aeddddd.ae2enhanced.gui;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyFormed;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyPattern;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyUnformed;
+import com.github.aeddddd.ae2enhanced.container.ContainerHyperdimensionalUnformed;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import net.minecraft.entity.player.EntityPlayer;
@@ -16,6 +17,7 @@ public class GuiHandler implements IGuiHandler {
     public static final int GUI_ASSEMBLY_CONTROLLER = 0;
     public static final int GUI_ASSEMBLY_PATTERN = 1;
     public static final int GUI_HYPERDIMENSIONAL_NEXUS = 2;
+    public static final int GUI_HYPERDIMENSIONAL_UNFORMED = 3;
 
     /** 编码页码到 GUI ID：低4位为 base ID，bit8-15为页码，bit16-20为 patternPages */
     public static int encodePatternId(int page, int patternPages) {
@@ -50,6 +52,10 @@ public class GuiHandler implements IGuiHandler {
                 return new ContainerAssemblyPattern(player.inventory, tile, page, patternPages);
             }
         } else if (te instanceof TileHyperdimensionalController) {
+            TileHyperdimensionalController tile = (TileHyperdimensionalController) te;
+            if (ID == GUI_HYPERDIMENSIONAL_UNFORMED && !tile.isFormed()) {
+                return new ContainerHyperdimensionalUnformed(player.inventory, tile);
+            }
             // 信息面板不需要服务器端 Container
             return null;
         }
@@ -74,8 +80,11 @@ public class GuiHandler implements IGuiHandler {
                 return new GuiAssemblyPattern(player.inventory, tile, page, patternPages);
             }
         } else if (te instanceof TileHyperdimensionalController) {
-            if (ID == GUI_HYPERDIMENSIONAL_NEXUS) {
-                return new GuiHyperdimensionalNexus((TileHyperdimensionalController) te);
+            TileHyperdimensionalController tile = (TileHyperdimensionalController) te;
+            if (ID == GUI_HYPERDIMENSIONAL_NEXUS && tile.isFormed()) {
+                return new GuiHyperdimensionalNexus(tile);
+            } else if (ID == GUI_HYPERDIMENSIONAL_UNFORMED && !tile.isFormed()) {
+                return new GuiHyperdimensionalUnformed(player.inventory, tile);
             }
         }
         return null;
