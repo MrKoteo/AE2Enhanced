@@ -46,7 +46,9 @@ public class HyperdimensionalStorageFile {
     private final ScheduledFuture<?> flushTask;
     private volatile boolean dirty = false;
     private volatile boolean closed = false;
+    private volatile boolean safeMode = false;
     private Map<ItemDescriptor, BigInteger> storageRef = null;
+    private Map<FluidDescriptor, BigInteger> fluidStorageRef = null;
 
     public HyperdimensionalStorageFile(World world, UUID nexusId) {
         this.nexusId = nexusId;
@@ -60,7 +62,7 @@ public class HyperdimensionalStorageFile {
     }
 
     /**
-     * 从文件加载数据到目标 Map。若文件不存在则不做任何事（空存储）。
+     * 从文件加载物品数据到目标 Map。若文件不存在则不做任何事（空存储）。
      */
     public void load(Map<ItemDescriptor, BigInteger> target) {
         if (!file.exists()) return;
@@ -89,27 +91,74 @@ public class HyperdimensionalStorageFile {
                 }
                 target.put(descriptor, count);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
-                "[AE2E] Failed to load storage file: {}", file.getAbsolutePath(), e);
+                "[AE2E] Failed to load storage file: {}. Entering safe mode (read-only).", file.getAbsolutePath(), e);
+            safeMode = true;
         }
     }
 
     /**
-     * 将当前内存数据保存到文件。
+     * 从文件加载流体数据到目标 Map。若文件不存在则不做任何事（空存储）。
+     */
+    public void loadFluids(Map<FluidDescriptor, BigInteger> target) {
+        if (!file.exists()) return;
+        try {
+            NBTTagCompound root = CompressedStreamTools.read(file);
+            if (root == null) return;
+            int version = root.getInteger("version");
+            if (version > CURRENT_VERSION) {
+                return;
+            }
+            if (!root.hasKey("fluids", 9)) return; // 旧版本可能没有 fluids
+            NBTTagList fluids = root.getTagList("fluids", 10);
+            for (int i = 0; i < fluids.tagCount(); i++) {
+                NBTTagCompound tag = fluids.getCompoundTagAt(i);
+                FluidDescriptor descriptor = FluidDescriptor.fromNBT(tag);
+                if (descriptor == null) continue;
+                String countStr = tag.getString("Count");
+                BigInteger count;
+                try {
+                    count = new BigInteger(countStr);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                target.put(descriptor, count);
+            }
+        } catch (Exception e) {
+            com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
+                "[AE2E] Failed to load fluid storage from file: {}.", file.getAbsolutePath(), e);
+        }
+    }
+
+    /**
+     * 将当前内存数据保存到文件（物品 + 流体）。
      * @return true 表示保存成功，false 表示失败
      */
-    public boolean save(Map<ItemDescriptor, BigInteger> source) {
+    public boolean save() {
         NBTTagCompound root = new NBTTagCompound();
         root.setInteger("version", CURRENT_VERSION);
         root.setUniqueId("nexusId", nexusId);
+
         NBTTagList items = new NBTTagList();
-        for (Map.Entry<ItemDescriptor, BigInteger> entry : source.entrySet()) {
-            NBTTagCompound tag = entry.getKey().toNBT();
-            tag.setString("Count", entry.getValue().toString());
-            items.appendTag(tag);
+        if (storageRef != null) {
+            for (Map.Entry<ItemDescriptor, BigInteger> entry : storageRef.entrySet()) {
+                NBTTagCompound tag = entry.getKey().toNBT();
+                tag.setString("Count", entry.getValue().toString());
+                items.appendTag(tag);
+            }
         }
         root.setTag("items", items);
+
+        NBTTagList fluids = new NBTTagList();
+        if (fluidStorageRef != null) {
+            for (Map.Entry<FluidDescriptor, BigInteger> entry : fluidStorageRef.entrySet()) {
+                NBTTagCompound tag = entry.getKey().toNBT();
+                tag.setString("Count", entry.getValue().toString());
+                fluids.appendTag(tag);
+            }
+        }
+        root.setTag("fluids", fluids);
 
         File tmpFile = new File(file.getAbsolutePath() + ".tmp");
         try {
@@ -123,7 +172,8 @@ public class HyperdimensionalStorageFile {
             return true;
         } catch (IOException e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
-                "[AE2E] Failed to save storage file: {}", file.getAbsolutePath(), e);
+                "[AE2E] Failed to save storage file: {}. Entering safe mode (read-only).", file.getAbsolutePath(), e);
+            safeMode = true;
             return false;
         }
     }
@@ -136,9 +186,13 @@ public class HyperdimensionalStorageFile {
         this.storageRef = ref;
     }
 
+    public void setFluidStorageRef(Map<FluidDescriptor, BigInteger> ref) {
+        this.fluidStorageRef = ref;
+    }
+
     private void flush() {
         if (!dirty || closed) return;
-        if (storageRef != null && save(storageRef)) {
+        if (save()) {
             dirty = false;
         }
         // save 失败时 dirty 保持 true，下次继续尝试
@@ -147,19 +201,25 @@ public class HyperdimensionalStorageFile {
     /**
      * 关闭文件句柄，强制刷盘一次。
      */
-    public void close(Map<ItemDescriptor, BigInteger> finalSnapshot) {
+    public void close() {
         if (closed) return;
         closed = true;
         if (flushTask != null) {
             flushTask.cancel(false);
         }
-        if (finalSnapshot != null) {
-            save(finalSnapshot);
-        }
+        save();
     }
 
     public boolean isClosed() {
         return closed;
+    }
+
+    public boolean isSafeMode() {
+        return safeMode;
+    }
+
+    public void setSafeMode(boolean safeMode) {
+        this.safeMode = safeMode;
     }
 
     public UUID getNexusId() {

@@ -4,9 +4,11 @@ import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.ModBlocks;
 import com.github.aeddddd.ae2enhanced.ModItems;
 import com.github.aeddddd.ae2enhanced.client.render.RenderBlackHole;
+import com.github.aeddddd.ae2enhanced.client.render.RenderHyperdimensionalController;
 import com.github.aeddddd.ae2enhanced.client.render.RenderMicroSingularity;
 import com.github.aeddddd.ae2enhanced.item.ItemUpgradeCard;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
+import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import com.github.aeddddd.ae2enhanced.tile.TileMicroSingularity;
 import net.minecraft.block.Block;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
@@ -35,6 +37,7 @@ public class ClientProxy extends CommonProxy {
         super.init(event);
         ClientRegistry.bindTileEntitySpecialRenderer(TileAssemblyController.class, new RenderBlackHole());
         ClientRegistry.bindTileEntitySpecialRenderer(TileMicroSingularity.class, new RenderMicroSingularity());
+        ClientRegistry.bindTileEntitySpecialRenderer(TileHyperdimensionalController.class, new RenderHyperdimensionalController());
     }
 
     @Override
