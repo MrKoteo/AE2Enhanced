@@ -11,6 +11,7 @@ import appeng.api.util.DimensionalCoord;
 import appeng.me.helpers.AENetworkProxy;
 import appeng.me.helpers.IGridProxyable;
 import com.github.aeddddd.ae2enhanced.ModBlocks;
+import com.github.aeddddd.ae2enhanced.storage.FluidStorageAdapter;
 import com.github.aeddddd.ae2enhanced.storage.HyperdimensionalStorageFile;
 import com.github.aeddddd.ae2enhanced.storage.ItemStorageAdapter;
 import com.github.aeddddd.ae2enhanced.storage.SimpleMEMonitor;
@@ -40,10 +41,12 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
     private UUID nexusId;
     private HyperdimensionalStorageFile storageFile;
     private ItemStorageAdapter itemAdapter;
+    private FluidStorageAdapter fluidAdapter;
     private SimpleMEMonitor itemMonitor;
 
     private boolean networkActive = false;
     private boolean networkPowered = false;
+    private boolean clientSafeMode = false;
     private int tickCounter = 0;
 
     // 客户端同步的存储统计
@@ -60,6 +63,10 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
 
     public ItemStorageAdapter getItemAdapter() {
         return itemAdapter;
+    }
+
+    public FluidStorageAdapter getFluidAdapter() {
+        return fluidAdapter;
     }
 
     public SimpleMEMonitor getItemMonitor() {
@@ -120,9 +127,12 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
 
     @Override
     public List<appeng.api.storage.IMEInventoryHandler> getCellArray(appeng.api.storage.IStorageChannel<?> channel) {
-        if (!formed || itemAdapter == null) return Collections.emptyList();
-        if (channel instanceof appeng.api.storage.channels.IItemStorageChannel) {
+        if (!formed) return Collections.emptyList();
+        if (channel instanceof appeng.api.storage.channels.IItemStorageChannel && itemAdapter != null) {
             return Collections.singletonList(itemAdapter);
+        }
+        if (channel instanceof appeng.api.storage.channels.IFluidStorageChannel && fluidAdapter != null) {
+            return Collections.singletonList(fluidAdapter);
         }
         return Collections.emptyList();
     }
@@ -205,6 +215,10 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
             storageFile.setStorageRef(itemAdapter.getStorageMap());
             itemAdapter.setOnChangeCallback(this::refreshNetworkMonitor);
             itemMonitor = new SimpleMEMonitor(itemAdapter);
+
+            fluidAdapter = new FluidStorageAdapter(storageFile);
+            storageFile.setFluidStorageRef(fluidAdapter.getStorageMap());
+            fluidAdapter.setOnChangeCallback(this::refreshNetworkMonitor);
         }
     }
 
@@ -248,9 +262,10 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
 
     private void closeStorage() {
         if (storageFile != null) {
-            storageFile.close(itemAdapter != null ? itemAdapter.getStorageMap() : null);
+            storageFile.close();
             storageFile = null;
             itemAdapter = null;
+            fluidAdapter = null;
             itemMonitor = null;
         }
     }
@@ -293,6 +308,11 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
                 }
             }
 
+            boolean newSafeMode = isSafeMode();
+            if (newSafeMode != clientSafeMode) {
+                clientSafeMode = newSafeMode;
+                needUpdate = true;
+            }
             if (needUpdate) {
                 markDirty();
                 world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
@@ -314,6 +334,15 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
 
     public String getClientStorageTotal() {
         return clientStorageTotal;
+    }
+
+    public boolean isSafeMode() {
+        return (itemAdapter != null && itemAdapter.isSafeMode())
+            || (fluidAdapter != null && fluidAdapter.isSafeMode());
+    }
+
+    public boolean getClientSafeMode() {
+        return clientSafeMode;
     }
 
     private static String formatBigNumber(java.math.BigInteger num) {
@@ -364,6 +393,7 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
         tag.setBoolean("networkPowered", networkPowered);
         tag.setInteger("storageTypes", clientStorageTypes);
         tag.setString("storageTotal", clientStorageTotal);
+        tag.setBoolean("safeMode", clientSafeMode);
         if (nexusId != null) {
             tag.setUniqueId("nexusId", nexusId);
         }
@@ -378,6 +408,7 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
         networkPowered = tag.getBoolean("networkPowered");
         clientStorageTypes = tag.getInteger("storageTypes");
         clientStorageTotal = tag.getString("storageTotal");
+        clientSafeMode = tag.getBoolean("safeMode");
         if (tag.hasUniqueId("nexusId")) {
             nexusId = tag.getUniqueId("nexusId");
         }

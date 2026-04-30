@@ -1,18 +1,17 @@
 package com.github.aeddddd.ae2enhanced.storage;
 
 import appeng.api.AEApi;
-import appeng.api.config.Actionable;
-import appeng.api.networking.security.IActionSource;
 import appeng.api.config.AccessRestriction;
+import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.storage.IMEInventoryHandler;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.IMEMonitorHandlerReceiver;
 import appeng.api.storage.IStorageChannel;
-import appeng.api.storage.channels.IItemStorageChannel;
-import appeng.api.storage.data.IAEItemStack;
+import appeng.api.storage.channels.IFluidStorageChannel;
+import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IItemList;
-import net.minecraft.item.ItemStack;
+import net.minecraftforge.fluids.FluidStack;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -22,36 +21,37 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 物品存储适配器，实现 AE2 的 IMEInventory 接口。
+ * 流体存储适配器，实现 AE2 的 IMEMonitor<IAEFluidStack> 接口。
  * 内部使用 BigInteger 维护数量，突破 long 上限。
  */
-public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
+public class FluidStorageAdapter implements IMEMonitor<IAEFluidStack> {
 
-    private final Map<ItemDescriptor, BigInteger> storage = new ConcurrentHashMap<>();
-    private final IItemStorageChannel channel;
+    private final Map<FluidDescriptor, BigInteger> storage = new ConcurrentHashMap<>();
+    private final IFluidStorageChannel channel;
     private final HyperdimensionalStorageFile file;
-    private final List<IMEMonitorHandlerReceiver<IAEItemStack>> listeners = new CopyOnWriteArrayList<>();
+    private final List<IMEMonitorHandlerReceiver<IAEFluidStack>> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<BigInteger> totalCount = new AtomicReference<>(BigInteger.ZERO);
     private Runnable onChangeCallback = null;
 
-    public ItemStorageAdapter(HyperdimensionalStorageFile file) {
-        this.channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
+    public FluidStorageAdapter(HyperdimensionalStorageFile file) {
+        this.channel = AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class);
         this.file = file;
-        file.load(storage);
+        file.loadFluids(storage);
     }
 
-    public Map<ItemDescriptor, BigInteger> getStorageMap() {
+    public Map<FluidDescriptor, BigInteger> getStorageMap() {
         return storage;
     }
 
     @Override
-    public IAEItemStack injectItems(IAEItemStack input, Actionable type, IActionSource src) {
+    public IAEFluidStack injectItems(IAEFluidStack input, Actionable type, IActionSource src) {
         if (input == null || input.getStackSize() <= 0) return null;
         if (file != null && file.isSafeMode()) {
-            return input; // 安全模式：拒绝写入，返回原物品
+            return input; // 安全模式：拒绝写入，返回原流体
         }
-        ItemStack itemStack = input.createItemStack();
-        ItemDescriptor key = new ItemDescriptor(itemStack);
+        FluidStack fluidStack = input.getFluidStack();
+        if (fluidStack == null) return null;
+        FluidDescriptor key = new FluidDescriptor(fluidStack);
         BigInteger amount = BigInteger.valueOf(input.getStackSize());
 
         if (type == Actionable.MODULATE) {
@@ -66,10 +66,11 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     }
 
     @Override
-    public IAEItemStack extractItems(IAEItemStack request, Actionable type, IActionSource src) {
+    public IAEFluidStack extractItems(IAEFluidStack request, Actionable type, IActionSource src) {
         if (request == null || request.getStackSize() <= 0) return null;
-        ItemStack itemStack = request.createItemStack();
-        ItemDescriptor key = new ItemDescriptor(itemStack);
+        FluidStack fluidStack = request.getFluidStack();
+        if (fluidStack == null) return null;
+        FluidDescriptor key = new FluidDescriptor(fluidStack);
         BigInteger available = storage.getOrDefault(key, BigInteger.ZERO);
         BigInteger requested = BigInteger.valueOf(request.getStackSize());
         BigInteger toExtract = available.min(requested);
@@ -87,12 +88,12 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
             }
             totalCount.updateAndGet(t -> t.subtract(toExtract));
             file.markDirty();
-            IAEItemStack change = request.copy();
+            IAEFluidStack change = request.copy();
             change.setStackSize(-toExtract.min(BigInteger.valueOf(Long.MAX_VALUE)).longValue());
             notifyPostChange(change, src);
         }
 
-        IAEItemStack result = channel.createStack(itemStack);
+        IAEFluidStack result = channel.createStack(fluidStack);
         if (result == null) return null;
 
         // BigInteger -> long 分片：若超过 Long.MAX_VALUE，本次只提取 Long.MAX_VALUE
@@ -105,14 +106,14 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     }
 
     @Override
-    public IItemList<IAEItemStack> getAvailableItems(IItemList<IAEItemStack> out) {
-        for (Map.Entry<ItemDescriptor, BigInteger> entry : storage.entrySet()) {
-            ItemDescriptor desc = entry.getKey();
-            IAEItemStack aeStack = desc.getAETemplate(channel);
+    public IItemList<IAEFluidStack> getAvailableItems(IItemList<IAEFluidStack> out) {
+        for (Map.Entry<FluidDescriptor, BigInteger> entry : storage.entrySet()) {
+            FluidDescriptor desc = entry.getKey();
+            IAEFluidStack aeStack = desc.getAETemplate(channel);
             if (aeStack == null) continue;
 
             BigInteger count = entry.getValue();
-            IAEItemStack copy = aeStack.copy();
+            IAEFluidStack copy = aeStack.copy();
             if (count.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0) {
                 copy.setStackSize(Long.MAX_VALUE);
             } else {
@@ -124,7 +125,7 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     }
 
     @Override
-    public IStorageChannel<IAEItemStack> getChannel() {
+    public IStorageChannel<IAEFluidStack> getChannel() {
         return channel;
     }
 
@@ -148,12 +149,12 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     }
 
     @Override
-    public boolean isPrioritized(IAEItemStack input) {
+    public boolean isPrioritized(IAEFluidStack input) {
         return false;
     }
 
     @Override
-    public boolean canAccept(IAEItemStack input) {
+    public boolean canAccept(IAEFluidStack input) {
         return true;
     }
 
@@ -164,7 +165,7 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
 
     @Override
     public int getSlot() {
-        return 0;
+        return 1;
     }
 
     @Override
@@ -175,18 +176,18 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     // ---- IMEMonitor / IBaseMonitor ----
 
     @Override
-    public IItemList<IAEItemStack> getStorageList() {
-        IItemList<IAEItemStack> list = channel.createList();
+    public IItemList<IAEFluidStack> getStorageList() {
+        IItemList<IAEFluidStack> list = channel.createList();
         return getAvailableItems(list);
     }
 
     @Override
-    public void addListener(IMEMonitorHandlerReceiver<IAEItemStack> l, Object verificationToken) {
+    public void addListener(IMEMonitorHandlerReceiver<IAEFluidStack> l, Object verificationToken) {
         listeners.add(l);
     }
 
     @Override
-    public void removeListener(IMEMonitorHandlerReceiver<IAEItemStack> l) {
+    public void removeListener(IMEMonitorHandlerReceiver<IAEFluidStack> l) {
         listeners.remove(l);
     }
 
@@ -194,11 +195,11 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
         this.onChangeCallback = callback;
     }
 
-    private void notifyPostChange(IAEItemStack change, IActionSource src) {
+    private void notifyPostChange(IAEFluidStack change, IActionSource src) {
         if (listeners.isEmpty() && onChangeCallback == null) return;
         if (!listeners.isEmpty()) {
-            List<IAEItemStack> changes = java.util.Collections.singletonList(change);
-            for (IMEMonitorHandlerReceiver<IAEItemStack> listener : listeners) {
+            List<IAEFluidStack> changes = java.util.Collections.singletonList(change);
+            for (IMEMonitorHandlerReceiver<IAEFluidStack> listener : listeners) {
                 listener.postChange(this, changes, src);
             }
         }

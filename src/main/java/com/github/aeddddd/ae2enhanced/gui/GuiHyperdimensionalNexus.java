@@ -81,6 +81,15 @@ public class GuiHyperdimensionalNexus extends GuiScreen {
         // 分隔线
         drawRect(guiLeft + 16, guiTop + 22, guiLeft + xSize - 16, guiTop + 23, ACCENT_SOFT);
 
+        // 安全模式警告横幅
+        if (tile != null && tile.getClientSafeMode()) {
+            int bannerY = guiTop + 26;
+            drawRect(guiLeft + 10, bannerY, guiLeft + xSize - 10, bannerY + 12, 0x55ff0000);
+            String warn = "§c§l安全模式 — 存储只读";
+            int warnW = fontRenderer.getStringWidth(warn);
+            fontRenderer.drawString(warn, guiLeft + (xSize - warnW) / 2, bannerY + 2, 0xFFffaaaa);
+        }
+
         if (tile == null) {
             fontRenderer.drawString("§cTile 不可用", guiLeft + 20, guiTop + 40, TEXT_ERROR);
             super.drawScreen(mouseX, mouseY, partialTicks);
@@ -89,6 +98,9 @@ public class GuiHyperdimensionalNexus extends GuiScreen {
 
         int x = guiLeft + 20;
         int y = guiTop + 42;
+        if (tile != null && tile.getClientSafeMode()) {
+            y += 14; // 为安全模式横幅让出空间
+        }
         int lineHeight = 14;
 
         // 结构状态
