@@ -15,10 +15,10 @@ import appeng.api.storage.data.IItemList;
 import net.minecraft.item.ItemStack;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 物品存储适配器，实现 AE2 的 IMEInventory 接口。
@@ -29,7 +29,7 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     private final Map<ItemDescriptor, BigInteger> storage = new ConcurrentHashMap<>();
     private final IItemStorageChannel channel;
     private final HyperdimensionalStorageFile file;
-    private final List<IMEMonitorHandlerReceiver<IAEItemStack>> listeners = new ArrayList<>();
+    private final List<IMEMonitorHandlerReceiver<IAEItemStack>> listeners = new CopyOnWriteArrayList<>();
     private Runnable onChangeCallback = null;
 
     public ItemStorageAdapter(HyperdimensionalStorageFile file) {
@@ -182,9 +182,8 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     private void notifyPostChange(IAEItemStack change, IActionSource src) {
         if (listeners.isEmpty() && onChangeCallback == null) return;
         if (!listeners.isEmpty()) {
-            List<IAEItemStack> changes = new ArrayList<>();
-            changes.add(change);
-            for (IMEMonitorHandlerReceiver<IAEItemStack> listener : new ArrayList<>(listeners)) {
+            List<IAEItemStack> changes = java.util.Collections.singletonList(change);
+            for (IMEMonitorHandlerReceiver<IAEItemStack> listener : listeners) {
                 listener.postChange(this, changes, src);
             }
         }

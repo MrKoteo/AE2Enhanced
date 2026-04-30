@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -31,9 +32,16 @@ public class HyperdimensionalStorageFile {
 
     public static final int CURRENT_VERSION = 1;
 
+    private static final ScheduledExecutorService FLUSH_EXECUTOR =
+        Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "AE2E-Storage-Flush");
+            t.setDaemon(true);
+            return t;
+        });
+
     private final File file;
     private final UUID nexusId;
-    private final ScheduledExecutorService executor;
+    private final ScheduledFuture<?> flushTask;
     private volatile boolean dirty = false;
     private volatile boolean closed = false;
     private Map<ItemDescriptor, BigInteger> storageRef = null;
@@ -46,12 +54,7 @@ public class HyperdimensionalStorageFile {
             storageDir.mkdirs();
         }
         this.file = new File(storageDir, nexusId.toString() + ".dat");
-        this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "AE2E-Storage-" + nexusId.toString().substring(0, 8));
-            t.setDaemon(true);
-            return t;
-        });
-        this.executor.scheduleWithFixedDelay(this::flush, 5, 5, TimeUnit.SECONDS);
+        this.flushTask = FLUSH_EXECUTOR.scheduleWithFixedDelay(this::flush, 5, 5, TimeUnit.SECONDS);
     }
 
     /**
@@ -90,8 +93,9 @@ public class HyperdimensionalStorageFile {
 
     /**
      * 将当前内存数据保存到文件。
+     * @return true 表示保存成功，false 表示失败
      */
-    public void save(Map<ItemDescriptor, BigInteger> source) {
+    public boolean save(Map<ItemDescriptor, BigInteger> source) {
         NBTTagCompound root = new NBTTagCompound();
         root.setInteger("version", CURRENT_VERSION);
         root.setUniqueId("nexusId", nexusId);
@@ -112,9 +116,11 @@ public class HyperdimensionalStorageFile {
             if (!tmpFile.renameTo(file)) {
                 throw new IOException("Failed to rename temp file to storage file");
             }
+            return true;
         } catch (IOException e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
                 "[AE2E] Failed to save storage file: {}", file.getAbsolutePath(), e);
+            return false;
         }
     }
 
@@ -128,10 +134,10 @@ public class HyperdimensionalStorageFile {
 
     private void flush() {
         if (!dirty || closed) return;
-        if (storageRef != null) {
-            save(storageRef);
+        if (storageRef != null && save(storageRef)) {
+            dirty = false;
         }
-        dirty = false;
+        // save 失败时 dirty 保持 true，下次继续尝试
     }
 
     /**
@@ -140,14 +146,8 @@ public class HyperdimensionalStorageFile {
     public void close(Map<ItemDescriptor, BigInteger> finalSnapshot) {
         if (closed) return;
         closed = true;
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
+        if (flushTask != null) {
+            flushTask.cancel(false);
         }
         if (finalSnapshot != null) {
             save(finalSnapshot);
