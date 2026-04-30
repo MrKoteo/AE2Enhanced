@@ -71,10 +71,9 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
         double cz = z + 0.5 + offZ;
 
         double renderDist = AE2EnhancedConfig.render.renderDistance;
-        double dx = cx - rendererDispatcher.entityX;
-        double dy = cy - rendererDispatcher.entityY;
-        double dz = cz - rendererDispatcher.entityZ;
-        if (dx * dx + dy * dy + dz * dz > renderDist * renderDist) {
+        // cx/cy/cz are already camera-relative (x = tileX - entityX)
+        double distSq = cx * cx + cy * cy + cz * cz;
+        if (distSq > renderDist * renderDist) {
             return;
         }
 
