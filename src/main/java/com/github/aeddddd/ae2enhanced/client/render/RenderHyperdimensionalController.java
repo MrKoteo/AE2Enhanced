@@ -12,7 +12,7 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * 超维度仓储中枢控制器的 TESR：超立方体全息投影。
- * 绘制一个缓慢旋转的线框超立方体（双立方体 + 连接边），
+ * 绘制一个缓慢旋转的线框超立方体（双立方体 + 连接边 + 顶点发光 + 旋转光环），
  * 带有青色发光效果和脉冲呼吸动画。
  *
  * GL 状态恢复策略：所有修改的状态在 finally 中显式恢复。
@@ -20,20 +20,25 @@ import org.lwjgl.opengl.GL11;
 public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<TileHyperdimensionalController> {
 
     // 外立方体半对角线长度（从中心到顶点）
-    private static final float OUTER_SIZE = 2.4f;
+    private static final float OUTER_SIZE = 3.2f;
     // 内立方体半对角线长度
-    private static final float INNER_SIZE = 1.2f;
+    private static final float INNER_SIZE = 1.6f;
     // 主旋转速度
     private static final float ROT_SPEED = 0.8f;
     // 内立方体反向旋转速度
     private static final float INNER_ROT_SPEED = -0.5f;
     // 脉冲速度
     private static final float PULSE_SPEED = 0.06f;
+    // 光环旋转速度
+    private static final float RING_SPEED = 1.2f;
 
     // 颜色：青色发光
     private static final int COLOR_OUTER = 0x00d4ff;
     private static final int COLOR_INNER = 0x0088cc;
     private static final int COLOR_CONNECT = 0x44aaff;
+    private static final int COLOR_VERTEX = 0x66ffff;
+    private static final int COLOR_RING = 0x88eeff;
+    private static final int COLOR_DIAGONAL = 0x2266aa;
 
     @Override
     public void render(TileHyperdimensionalController te, double x, double y, double z,
@@ -43,6 +48,7 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
         float time = (te.getWorld().getTotalWorldTime() + partialTicks) * ROT_SPEED;
         float innerTime = (te.getWorld().getTotalWorldTime() + partialTicks) * INNER_ROT_SPEED;
         float pulse = 0.5f + 0.5f * (float) Math.sin((te.getWorld().getTotalWorldTime() + partialTicks) * PULSE_SPEED);
+        float ringTime = (te.getWorld().getTotalWorldTime() + partialTicks) * RING_SPEED;
 
         // 结构几何中心（相对于控制器）
         // 结构范围：x∈[-2,2], z∈[0,4]，中心在 (0,0,2)
@@ -59,7 +65,7 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
         }
 
         double cx = x + 0.5 + offX;
-        double cy = y + 2.5; // 在结构平面上方 2 格
+        double cy = y + 4.0; // 在结构平面上方 3.5 格
         double cz = z + 0.5 + offZ;
 
         GlStateManager.pushMatrix();
@@ -83,18 +89,36 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
             GlStateManager.pushMatrix();
             GlStateManager.rotate(time, 0, 1, 0);
             GlStateManager.rotate(time * 0.3f, 1, 0, 0);
-            drawCubeWireframe(OUTER_SIZE, COLOR_OUTER, 0.55f + 0.25f * pulse, 2.5f);
+            drawCubeWireframe(OUTER_SIZE, COLOR_OUTER, 0.55f + 0.25f * pulse, 3.0f);
+            // 外立方体顶点发光
+            drawVertexGlows(OUTER_SIZE, COLOR_VERTEX, 0.75f + 0.2f * pulse, 0.10f);
             GlStateManager.popMatrix();
 
             // 内立方体线框（反向旋转）
             GlStateManager.pushMatrix();
             GlStateManager.rotate(innerTime, 0, 1, 0);
             GlStateManager.rotate(innerTime * 0.4f, 0, 0, 1);
-            drawCubeWireframe(INNER_SIZE, COLOR_INNER, 0.35f + 0.20f * pulse, 1.5f);
+            drawCubeWireframe(INNER_SIZE, COLOR_INNER, 0.35f + 0.20f * pulse, 2.0f);
             GlStateManager.popMatrix();
 
             // 连接内外立方体对应顶点的边（超立方体特征）
-            drawConnectionLines(time, innerTime, OUTER_SIZE, INNER_SIZE, COLOR_CONNECT, 0.18f + 0.12f * pulse);
+            drawConnectionLines(time, innerTime, OUTER_SIZE, INNER_SIZE, COLOR_CONNECT, 0.20f + 0.14f * pulse, 2.0f);
+
+            // 对角交叉支撑（增强超立方体感）
+            drawDiagonalBraces(time, innerTime, OUTER_SIZE, INNER_SIZE, COLOR_DIAGONAL, 0.12f + 0.08f * pulse, 1.2f);
+
+            // 水平旋转光环
+            GlStateManager.pushMatrix();
+            GlStateManager.rotate(ringTime, 0, 1, 0);
+            drawRing(OUTER_SIZE * 0.75f, COLOR_RING, 0.25f + 0.15f * pulse, 2.2f);
+            GlStateManager.popMatrix();
+
+            // 垂直倾斜旋转光环
+            GlStateManager.pushMatrix();
+            GlStateManager.rotate(ringTime * 0.7f, 1, 0, 0);
+            GlStateManager.rotate(45, 0, 1, 0);
+            drawRing(INNER_SIZE * 1.2f, COLOR_RING, 0.18f + 0.12f * pulse, 1.8f);
+            GlStateManager.popMatrix();
 
             // 中心核心点（小光球）
             drawCenterCore(pulse);
@@ -164,12 +188,80 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
     }
 
     /**
+     * 在立方体 8 个顶点处绘制发光小立方体。
+     */
+    private void drawVertexGlows(float size, int color, float alpha, float glowSize) {
+        if (alpha <= 0.01f) return;
+
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+
+        float half = size / 1.73205f;
+
+        float[][] verts = {
+            {-half, -half, -half},
+            { half, -half, -half},
+            { half,  half, -half},
+            {-half,  half, -half},
+            {-half, -half,  half},
+            { half, -half,  half},
+            { half,  half,  half},
+            {-half,  half,  half},
+        };
+
+        Tessellator tess = Tessellator.getInstance();
+        BufferBuilder buf = tess.getBuffer();
+        buf.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+
+        for (float[] v : verts) {
+            drawSmallCube(buf, v[0], v[1], v[2], glowSize, r, g, b, alpha);
+        }
+
+        tess.draw();
+    }
+
+    private void drawSmallCube(BufferBuilder buf, float cx, float cy, float cz, float s, float r, float g, float b, float a) {
+        // 6 个面，每个面 4 个顶点
+        // 底面
+        buf.pos(cx-s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy-s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy-s, cz+s).color(r, g, b, a).endVertex();
+        // 顶面
+        buf.pos(cx-s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        // 前面
+        buf.pos(cx-s, cy-s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy-s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        // 后面
+        buf.pos(cx-s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        // 左面
+        buf.pos(cx-s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy-s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx-s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        // 右面
+        buf.pos(cx+s, cy-s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz-s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy+s, cz+s).color(r, g, b, a).endVertex();
+        buf.pos(cx+s, cy-s, cz+s).color(r, g, b, a).endVertex();
+    }
+
+    /**
      * 绘制连接内外立方体对应顶点的 8 条线。
      * 这是超立方体（Tesseract）在 3D 投影中的核心特征。
      */
     private void drawConnectionLines(float outerTime, float innerTime,
                                      float outerSize, float innerSize,
-                                     int color, float alpha) {
+                                     int color, float alpha, float lineWidth) {
         if (alpha <= 0.01f) return;
 
         float r = ((color >> 16) & 0xFF) / 255.0f;
@@ -184,6 +276,8 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
             {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
             {-1, -1,  1}, {1, -1,  1}, {1, 1,  1}, {-1, 1,  1},
         };
+
+        GlStateManager.glLineWidth(lineWidth);
 
         Tessellator tess = Tessellator.getInstance();
         BufferBuilder buf = tess.getBuffer();
@@ -206,6 +300,88 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
         }
 
         tess.draw();
+        GlStateManager.glLineWidth(1.0f);
+    }
+
+    /**
+     * 绘制内外立方体之间的对角交叉支撑线。
+     * 每个外顶点连接到相邻的两个内顶点，形成 X 形支撑。
+     */
+    private void drawDiagonalBraces(float outerTime, float innerTime,
+                                    float outerSize, float innerSize,
+                                    int color, float alpha, float lineWidth) {
+        if (alpha <= 0.01f) return;
+
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+
+        float outerHalf = outerSize / 1.73205f;
+        float innerHalf = innerSize / 1.73205f;
+
+        float[][] dirs = {
+            {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
+            {-1, -1,  1}, {1, -1,  1}, {1, 1,  1}, {-1, 1,  1},
+        };
+
+        // 对角连接映射：每个外顶点连接到两个相邻的内顶点（索引偏移）
+        int[][] diagMap = {
+            {1, 4}, {0, 5}, {3, 6}, {2, 7},
+            {0, 5}, {1, 4}, {3, 6}, {2, 7},
+        };
+
+        GlStateManager.glLineWidth(lineWidth);
+
+        Tessellator tess = Tessellator.getInstance();
+        BufferBuilder buf = tess.getBuffer();
+        buf.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
+
+        for (int i = 0; i < 8; i++) {
+            float[] ov = rotatePoint(
+                dirs[i][0] * outerHalf, dirs[i][1] * outerHalf, dirs[i][2] * outerHalf,
+                outerTime, outerTime * 0.3f, 0
+            );
+            for (int j : diagMap[i]) {
+                float[] iv = rotatePoint(
+                    dirs[j][0] * innerHalf, dirs[j][1] * innerHalf, dirs[j][2] * innerHalf,
+                    0, 0, innerTime
+                );
+                buf.pos(ov[0], ov[1], ov[2]).color(r, g, b, alpha).endVertex();
+                buf.pos(iv[0], iv[1], iv[2]).color(r, g, b, alpha).endVertex();
+            }
+        }
+
+        tess.draw();
+        GlStateManager.glLineWidth(1.0f);
+    }
+
+    /**
+     * 绘制一个水平圆环（由线段近似）。
+     */
+    private void drawRing(float radius, int color, float alpha, float lineWidth) {
+        if (alpha <= 0.01f) return;
+
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+
+        int segments = 48;
+
+        GlStateManager.glLineWidth(lineWidth);
+
+        Tessellator tess = Tessellator.getInstance();
+        BufferBuilder buf = tess.getBuffer();
+        buf.begin(GL11.GL_LINE_LOOP, DefaultVertexFormats.POSITION_COLOR);
+
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) (2 * Math.PI * i / segments);
+            float px = (float) Math.cos(angle) * radius;
+            float pz = (float) Math.sin(angle) * radius;
+            buf.pos(px, 0, pz).color(r, g, b, alpha).endVertex();
+        }
+
+        tess.draw();
+        GlStateManager.glLineWidth(1.0f);
     }
 
     /**
@@ -240,8 +416,8 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
      * 中心核心：一个微小的旋转八面体，表示奇点。
      */
     private void drawCenterCore(float pulse) {
-        float alpha = 0.3f + 0.3f * pulse;
-        float size = 0.06f + 0.03f * pulse;
+        float alpha = 0.35f + 0.35f * pulse;
+        float size = 0.10f + 0.05f * pulse;
 
         float r = 0.0f, g = 0.83f, b = 1.0f;
 
