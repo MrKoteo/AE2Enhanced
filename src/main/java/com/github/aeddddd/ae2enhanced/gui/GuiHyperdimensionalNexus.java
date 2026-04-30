@@ -128,13 +128,13 @@ public class GuiHyperdimensionalNexus extends GuiScreen {
             y += lineHeight;
         }
 
-        // 存储统计（客户端同步字段）
+        // 存储统计（客户端同步字段，含物品+流体）
         int types = tile.getClientStorageTypes();
         String total = tile.getClientStorageTotal();
         if (types > 0) {
-            fontRenderer.drawString("存储种类: §e" + types, x, y, TEXT_MAIN);
+            fontRenderer.drawString("存储种类: §e" + types + " §7(含流体)", x, y, TEXT_MAIN);
             y += lineHeight;
-            fontRenderer.drawString("总物品数: §e" + total, x, y, TEXT_MAIN);
+            fontRenderer.drawString("总存储数: §e" + total, x, y, TEXT_MAIN);
         } else {
             fontRenderer.drawString("存储核心: §7空", x, y, TEXT_MAIN);
         }
