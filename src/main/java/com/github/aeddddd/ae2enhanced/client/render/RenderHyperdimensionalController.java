@@ -1,11 +1,13 @@
 package com.github.aeddddd.ae2enhanced.client.render;
 
+import com.github.aeddddd.ae2enhanced.block.BlockHyperdimensionalController;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.util.EnumFacing;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -18,9 +20,9 @@ import org.lwjgl.opengl.GL11;
 public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<TileHyperdimensionalController> {
 
     // 外立方体半对角线长度（从中心到顶点）
-    private static final float OUTER_SIZE = 0.55f;
+    private static final float OUTER_SIZE = 1.2f;
     // 内立方体半对角线长度
-    private static final float INNER_SIZE = 0.28f;
+    private static final float INNER_SIZE = 0.6f;
     // 主旋转速度
     private static final float ROT_SPEED = 0.8f;
     // 内立方体反向旋转速度
@@ -42,9 +44,23 @@ public class RenderHyperdimensionalController extends TileEntitySpecialRenderer<
         float innerTime = (te.getWorld().getTotalWorldTime() + partialTicks) * INNER_ROT_SPEED;
         float pulse = 0.5f + 0.5f * (float) Math.sin((te.getWorld().getTotalWorldTime() + partialTicks) * PULSE_SPEED);
 
-        double cx = x + 0.5;
-        double cy = y + 0.5;
-        double cz = z + 0.5;
+        // 结构几何中心（相对于控制器）
+        // 结构范围：x∈[-2,2], z∈[0,4]，中心在 (0,0,2)
+        EnumFacing facing = EnumFacing.NORTH;
+        if (te.getWorld() != null) {
+            facing = te.getWorld().getBlockState(te.getPos()).getValue(BlockHyperdimensionalController.FACING);
+        }
+        double offX = 0, offZ = 2.0;
+        switch (facing) {
+            case SOUTH: offX = 0; offZ = -2.0; break;
+            case EAST:  offX = -2.0; offZ = 0; break;
+            case WEST:  offX = 2.0; offZ = 0; break;
+            default:    offX = 0; offZ = 2.0; break;
+        }
+
+        double cx = x + 0.5 + offX;
+        double cy = y + 2.5; // 在结构平面上方 2 格
+        double cz = z + 0.5 + offZ;
 
         GlStateManager.pushMatrix();
         GlStateManager.translate(cx, cy, cz);

@@ -190,6 +190,15 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
                 world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
             }
             getProxy().onReady();
+            // 强制触发 GridStorageCache 重新扫描 handlers，确保物品/流体都被正确注册
+            try {
+                appeng.api.networking.IGrid grid = getProxy().getGrid();
+                if (grid != null) {
+                    grid.postEvent(new appeng.api.networking.events.MENetworkCellArrayUpdate());
+                }
+            } catch (appeng.me.GridAccessException e) {
+                // grid 尚未就绪，下次 tick 的 update() 会重试
+            }
         }
     }
 
@@ -222,37 +231,55 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
         }
     }
 
-    // 缓存 AE2 NetworkMonitor.forceUpdate 字段，避免高频 IO 时重复反射查找
+    // 缓存 AE2 NetworkMonitor 反射，避免高频 IO 时重复反射查找
     private static final java.lang.reflect.Field FORCE_UPDATE_FIELD;
+    private static final java.lang.reflect.Method FORCE_UPDATE_METHOD;
     static {
         java.lang.reflect.Field f = null;
+        java.lang.reflect.Method m = null;
         try {
             Class<?> clazz = Class.forName("appeng.me.cache.NetworkMonitor");
             f = clazz.getDeclaredField("forceUpdate");
             f.setAccessible(true);
+            m = clazz.getDeclaredMethod("forceUpdate");
+            m.setAccessible(true);
         } catch (Exception e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.error(
-                "[AE2E] Failed to cache NetworkMonitor.forceUpdate field. ME terminal refresh will not work.", e);
+                "[AE2E] Failed to cache NetworkMonitor reflection. ME terminal refresh will not work.", e);
         }
         FORCE_UPDATE_FIELD = f;
+        FORCE_UPDATE_METHOD = m;
     }
 
     /**
      * 强制刷新 AE2 NetworkMonitor 缓存，使终端立即显示最新存储内容。
-     * 由于 AE2-UEL 不监听 IMEMonitor 的 addListener，只能通过反射设置 forceUpdate。
+     * 由于 AE2-UEL 不监听 IMEMonitor 的 addListener，只能通过反射设置 forceUpdate
+     * 并立即调用 forceUpdate() 方法，避免 detectAndSendChanges 在同一 tick 发送旧数据。
      */
     private void refreshNetworkMonitor() {
-        if (FORCE_UPDATE_FIELD == null) return;
+        if (FORCE_UPDATE_FIELD == null || FORCE_UPDATE_METHOD == null) return;
         try {
             appeng.api.networking.IGrid grid = getProxy().getGrid();
             if (grid == null) return;
             appeng.api.networking.storage.IStorageGrid storageGrid = grid.getCache(appeng.api.networking.storage.IStorageGrid.class);
             if (storageGrid == null) return;
-            appeng.api.storage.IMEMonitor<appeng.api.storage.data.IAEItemStack> monitor = storageGrid.getInventory(
+
+            // 刷新物品 monitor
+            appeng.api.storage.IMEMonitor<appeng.api.storage.data.IAEItemStack> itemMonitor = storageGrid.getInventory(
                 appeng.api.AEApi.instance().storage().getStorageChannel(appeng.api.storage.channels.IItemStorageChannel.class)
             );
-            if (monitor != null) {
-                FORCE_UPDATE_FIELD.setBoolean(monitor, true);
+            if (itemMonitor != null) {
+                FORCE_UPDATE_FIELD.setBoolean(itemMonitor, true);
+                FORCE_UPDATE_METHOD.invoke(itemMonitor);
+            }
+
+            // 刷新流体 monitor
+            appeng.api.storage.IMEMonitor<appeng.api.storage.data.IAEFluidStack> fluidMonitor = storageGrid.getInventory(
+                appeng.api.AEApi.instance().storage().getStorageChannel(appeng.api.storage.channels.IFluidStorageChannel.class)
+            );
+            if (fluidMonitor != null) {
+                FORCE_UPDATE_FIELD.setBoolean(fluidMonitor, true);
+                FORCE_UPDATE_METHOD.invoke(fluidMonitor);
             }
         } catch (Exception e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.warn(
@@ -297,15 +324,22 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
             networkActive = newActive;
             networkPowered = newPowered;
 
-            // 更新存储统计并同步到客户端
+            // 更新存储统计并同步到客户端（物品 + 流体）
+            int newTypes = 0;
+            java.math.BigInteger newTotal = java.math.BigInteger.ZERO;
             if (itemAdapter != null) {
-                int newTypes = itemAdapter.getStorageMap().size();
-                String newTotal = formatBigNumber(itemAdapter.getTotalCount());
-                if (newTypes != clientStorageTypes || !newTotal.equals(clientStorageTotal)) {
-                    clientStorageTypes = newTypes;
-                    clientStorageTotal = newTotal;
-                    needUpdate = true;
-                }
+                newTypes += itemAdapter.getStorageMap().size();
+                newTotal = newTotal.add(itemAdapter.getTotalCount());
+            }
+            if (fluidAdapter != null) {
+                newTypes += fluidAdapter.getStorageMap().size();
+                newTotal = newTotal.add(fluidAdapter.getTotalCount());
+            }
+            String newTotalStr = formatBigNumber(newTotal);
+            if (newTypes != clientStorageTypes || !newTotalStr.equals(clientStorageTotal)) {
+                clientStorageTypes = newTypes;
+                clientStorageTotal = newTotalStr;
+                needUpdate = true;
             }
 
             boolean newSafeMode = isSafeMode();
