@@ -223,11 +223,13 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
             itemAdapter = new ItemStorageAdapter(storageFile);
             storageFile.setStorageRef(itemAdapter.getStorageMap());
             itemAdapter.setOnChangeCallback(this::refreshNetworkMonitor);
+            itemAdapter.setPostChangeCallback(this::postItemAlteration);
             itemMonitor = new SimpleMEMonitor(itemAdapter);
 
             fluidAdapter = new FluidStorageAdapter(storageFile);
             storageFile.setFluidStorageRef(fluidAdapter.getStorageMap());
             fluidAdapter.setOnChangeCallback(this::refreshNetworkMonitor);
+            fluidAdapter.setPostChangeCallback(this::postFluidAlteration);
         }
     }
 
@@ -305,6 +307,40 @@ public class TileHyperdimensionalController extends TileEntity implements IGridP
         } catch (Exception e) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.warn(
                 "[AE2E] Failed to refresh NetworkMonitor cache", e);
+        }
+    }
+
+    /**
+     * 通过 IStorageGrid.postAlterationOfStoredItems 通知 AE2 网络物品发生变化。
+     * 这是 AE2 标准的增量更新路径，能正确处理物品完全消失的情况（forceUpdate 全量扫描无法处理）。
+     */
+    private void postItemAlteration(appeng.api.storage.data.IAEItemStack change, appeng.api.networking.security.IActionSource src) {
+        try {
+            appeng.api.networking.IGrid grid = getProxy().getGrid();
+            if (grid == null) return;
+            appeng.api.networking.storage.IStorageGrid storageGrid = grid.getCache(appeng.api.networking.storage.IStorageGrid.class);
+            if (storageGrid == null) return;
+            storageGrid.postAlterationOfStoredItems(
+                appeng.api.AEApi.instance().storage().getStorageChannel(appeng.api.storage.channels.IItemStorageChannel.class),
+                java.util.Collections.singletonList(change), src);
+        } catch (Exception e) {
+            com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.warn(
+                "[AE2E] Failed to post item alteration", e);
+        }
+    }
+
+    private void postFluidAlteration(appeng.api.storage.data.IAEFluidStack change, appeng.api.networking.security.IActionSource src) {
+        try {
+            appeng.api.networking.IGrid grid = getProxy().getGrid();
+            if (grid == null) return;
+            appeng.api.networking.storage.IStorageGrid storageGrid = grid.getCache(appeng.api.networking.storage.IStorageGrid.class);
+            if (storageGrid == null) return;
+            storageGrid.postAlterationOfStoredItems(
+                appeng.api.AEApi.instance().storage().getStorageChannel(appeng.api.storage.channels.IFluidStorageChannel.class),
+                java.util.Collections.singletonList(change), src);
+        } catch (Exception e) {
+            com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER.warn(
+                "[AE2E] Failed to post fluid alteration", e);
         }
     }
 
