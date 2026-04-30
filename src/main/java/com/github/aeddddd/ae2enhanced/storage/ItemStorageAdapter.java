@@ -33,6 +33,7 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
     private final List<IMEMonitorHandlerReceiver<IAEItemStack>> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<BigInteger> totalCount = new AtomicReference<>(BigInteger.ZERO);
     private Runnable onChangeCallback = null;
+    private java.util.function.BiConsumer<IAEItemStack, IActionSource> postChangeCallback = null;
 
     public ItemStorageAdapter(HyperdimensionalStorageFile file) {
         this.channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
@@ -203,13 +204,20 @@ public class ItemStorageAdapter implements IMEMonitor<IAEItemStack> {
         this.onChangeCallback = callback;
     }
 
+    public void setPostChangeCallback(java.util.function.BiConsumer<IAEItemStack, IActionSource> callback) {
+        this.postChangeCallback = callback;
+    }
+
     private void notifyPostChange(IAEItemStack change, IActionSource src) {
-        if (listeners.isEmpty() && onChangeCallback == null) return;
+        if (listeners.isEmpty() && onChangeCallback == null && postChangeCallback == null) return;
         if (!listeners.isEmpty()) {
             List<IAEItemStack> changes = java.util.Collections.singletonList(change);
             for (IMEMonitorHandlerReceiver<IAEItemStack> listener : listeners) {
                 listener.postChange(this, changes, src);
             }
+        }
+        if (postChangeCallback != null) {
+            postChangeCallback.accept(change, src);
         }
         if (onChangeCallback != null) {
             onChangeCallback.run();

@@ -32,6 +32,7 @@ public class FluidStorageAdapter implements IMEMonitor<IAEFluidStack> {
     private final List<IMEMonitorHandlerReceiver<IAEFluidStack>> listeners = new CopyOnWriteArrayList<>();
     private final AtomicReference<BigInteger> totalCount = new AtomicReference<>(BigInteger.ZERO);
     private Runnable onChangeCallback = null;
+    private java.util.function.BiConsumer<IAEFluidStack, IActionSource> postChangeCallback = null;
 
     public FluidStorageAdapter(HyperdimensionalStorageFile file) {
         this.channel = AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class);
@@ -204,13 +205,20 @@ public class FluidStorageAdapter implements IMEMonitor<IAEFluidStack> {
         this.onChangeCallback = callback;
     }
 
+    public void setPostChangeCallback(java.util.function.BiConsumer<IAEFluidStack, IActionSource> callback) {
+        this.postChangeCallback = callback;
+    }
+
     private void notifyPostChange(IAEFluidStack change, IActionSource src) {
-        if (listeners.isEmpty() && onChangeCallback == null) return;
+        if (listeners.isEmpty() && onChangeCallback == null && postChangeCallback == null) return;
         if (!listeners.isEmpty()) {
             List<IAEFluidStack> changes = java.util.Collections.singletonList(change);
             for (IMEMonitorHandlerReceiver<IAEFluidStack> listener : listeners) {
                 listener.postChange(this, changes, src);
             }
+        }
+        if (postChangeCallback != null) {
+            postChangeCallback.accept(change, src);
         }
         if (onChangeCallback != null) {
             onChangeCallback.run();
