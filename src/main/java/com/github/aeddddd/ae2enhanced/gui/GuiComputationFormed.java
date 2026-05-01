@@ -1,0 +1,111 @@
+package com.github.aeddddd.ae2enhanced.gui;
+
+import com.github.aeddddd.ae2enhanced.tile.TileComputationCore;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.GlStateManager;
+
+import java.io.IOException;
+
+/**
+ * Supercausal Computation Core formed state GUI.
+ * Pure display, no item slots, no inventory rendering.
+ */
+public class GuiComputationFormed extends GuiScreen {
+
+    private static final int PANEL_BG = 0xFF1a1a2e;
+    private static final int PANEL_LIGHT = 0xFF16213e;
+    private static final int BORDER_DIM = 0xFF0f3460;
+    private static final int ACCENT = 0xFF00d4ff;
+    private static final int ACCENT_SOFT = 0xFF0f4c75;
+    private static final int TEXT_MAIN = 0xFFe0e0e0;
+    private static final int TEXT_SUCCESS = 0xFF55ff88;
+    private static final int TEXT_WARN = 0xFFffaa55;
+
+    private final TileComputationCore tile;
+    private int xSize = 280;
+    private int ySize = 180;
+    private int guiLeft;
+    private int guiTop;
+
+    public GuiComputationFormed(TileComputationCore tile) {
+        this.tile = tile;
+    }
+
+    @Override
+    public void initGui() {
+        super.initGui();
+        this.guiLeft = (this.width - this.xSize) / 2;
+        this.guiTop = (this.height - this.ySize) / 2;
+    }
+
+    @Override
+    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.drawDefaultBackground();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+
+        drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + ySize, PANEL_BG);
+        drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + 2, ACCENT);
+
+        drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + 1, BORDER_DIM);
+        drawRect(guiLeft, guiTop + ySize - 1, guiLeft + xSize, guiTop + ySize, BORDER_DIM);
+        drawRect(guiLeft, guiTop, guiLeft + 1, guiTop + ySize, BORDER_DIM);
+        drawRect(guiLeft + xSize - 1, guiTop, guiLeft + xSize, guiTop + ySize, BORDER_DIM);
+
+        int corner = 10;
+        drawRect(guiLeft, guiTop, guiLeft + corner, guiTop + 2, ACCENT);
+        drawRect(guiLeft, guiTop, guiLeft + 2, guiTop + corner, ACCENT);
+        drawRect(guiLeft + xSize - corner, guiTop, guiLeft + xSize, guiTop + 2, ACCENT);
+        drawRect(guiLeft + xSize - 2, guiTop, guiLeft + xSize, guiTop + corner, ACCENT);
+        drawRect(guiLeft, guiTop + ySize - 2, guiLeft + corner, guiTop + ySize, ACCENT);
+        drawRect(guiLeft, guiTop + ySize - corner, guiLeft + 2, guiTop + ySize, ACCENT);
+        drawRect(guiLeft + xSize - corner, guiTop + ySize - 2, guiLeft + xSize, guiTop + ySize, ACCENT);
+        drawRect(guiLeft + xSize - 2, guiTop + ySize - corner, guiLeft + xSize, guiTop + ySize, ACCENT);
+
+        drawRect(guiLeft + 10, guiTop + 36, guiLeft + xSize - 10, guiTop + ySize - 10, PANEL_LIGHT);
+        drawRect(guiLeft + 10, guiTop + 36, guiLeft + xSize - 10, guiTop + 37, BORDER_DIM);
+        drawRect(guiLeft + 10, guiTop + ySize - 11, guiLeft + xSize - 10, guiTop + ySize - 10, BORDER_DIM);
+
+        String title = "\u00a7b" + net.minecraft.client.resources.I18n.format("tile.ae2enhanced.computation_core.name");
+        int titleWidth = fontRenderer.getStringWidth(title);
+        fontRenderer.drawString(title, guiLeft + (xSize - titleWidth) / 2, guiTop + 8, ACCENT);
+
+        drawRect(guiLeft + 16, guiTop + 22, guiLeft + xSize - 16, guiTop + 23, ACCENT_SOFT);
+
+        if (tile == null) {
+            fontRenderer.drawString("\u00a7cTile unavailable", guiLeft + 20, guiTop + 40, TEXT_WARN);
+            super.drawScreen(mouseX, mouseY, partialTicks);
+            return;
+        }
+
+        int x = guiLeft + 20;
+        int y = guiTop + 42;
+        int lineHeight = 14;
+
+        String formedStr = tile.isFormed() ? "\u00a7aFormed" : "\u00a7cNot Formed";
+        fontRenderer.drawString("Structure: " + formedStr, x, y, TEXT_MAIN);
+        y += lineHeight;
+
+        fontRenderer.drawString("Parallel Limit: \u00a7e" + tile.getParallelLimit(), x, y, TEXT_MAIN);
+        y += lineHeight;
+
+        fontRenderer.drawString("Active Orders: \u00a7e" + tile.getActiveOrderCount(), x, y, TEXT_MAIN);
+        y += lineHeight;
+
+        fontRenderer.drawString("Status: \u00a7aOperational", x, y, TEXT_MAIN);
+
+        super.drawScreen(mouseX, mouseY, partialTicks);
+    }
+
+    @Override
+    public boolean doesGuiPauseGame() {
+        return false;
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (keyCode == 1 || this.mc.gameSettings.keyBindInventory.isActiveAndMatches(keyCode)) {
+            this.mc.displayGuiScreen(null);
+        }
+        super.keyTyped(typedChar, keyCode);
+    }
+}

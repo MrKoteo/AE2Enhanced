@@ -108,4 +108,6 @@ tile.ae2enhanced.constant_spinor_field_casing.name=恒定旋量场外壳
 tile.ae2enhanced.causal_anchor_core.name=因果锚定核心
 tile.ae2enhanced.super_crafting_interface.name=超因果合成接口
 
+gui.ae2enhanced.computation.unformed.title=§c§l超因果计算核心 §r§8[未成型]
+
 death.spacetime.blackHole=%1$s 永远的迷失在事件视界中

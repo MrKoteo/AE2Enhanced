@@ -3,7 +3,9 @@ package com.github.aeddddd.ae2enhanced.network;
 import com.github.aeddddd.ae2enhanced.ModBlocks;
 import com.github.aeddddd.ae2enhanced.structure.AssemblyStructure;
 import com.github.aeddddd.ae2enhanced.structure.HyperdimensionalStructure;
+import com.github.aeddddd.ae2enhanced.structure.SupercausalStructure;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
+import com.github.aeddddd.ae2enhanced.tile.TileComputationCore;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -68,6 +70,16 @@ public class PacketRequestAssembly implements IMessage {
                         success = true;
                     } else {
                         success = HyperdimensionalStructure.tryConsumeAndPlace(world, pos, player);
+                    }
+                } else if (world.getBlockState(pos).getBlock() == ModBlocks.COMPUTATION_CORE
+                        && te instanceof TileComputationCore) {
+                    TileComputationCore tile = (TileComputationCore) te;
+                    if (tile.isFormed()) return;
+                    if (player.isCreative()) {
+                        SupercausalStructure.placeMissingBlocks(world, pos, player);
+                        success = true;
+                    } else {
+                        success = SupercausalStructure.tryConsumeAndPlace(world, pos, player);
                     }
                 }
 
