@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "normal": { "model": "ae2enhanced:super_crafting_interface" },
+    "inventory": { "model": "ae2enhanced:super_crafting_interface" }
+  }
+}
