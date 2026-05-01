@@ -6,9 +6,7 @@ import appeng.api.storage.IMEInventoryHandler;
 import appeng.api.storage.IStorageChannel;
 import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.channels.IItemStorageChannel;
-import com.mekeng.github.common.me.storage.IGasStorageChannel;
 import net.minecraftforge.fml.common.Loader;
-import thaumicenergistics.api.storage.IEssentiaStorageChannel;
 
 import java.math.BigInteger;
 import java.lang.reflect.Method;
@@ -100,10 +98,11 @@ public class OptionalStorageManager {
      */
     @SuppressWarnings("unchecked")
     public List<IMEInventoryHandler> getHandlers(IStorageChannel<?> channel) {
-        if (channel instanceof IGasStorageChannel && gasAdapter != null) {
+        String channelName = channel.getClass().getName();
+        if (gasAdapter != null && "com.mekeng.github.common.me.storage.IGasStorageChannel".equals(channelName)) {
             return Collections.singletonList(gasAdapter);
         }
-        if (channel instanceof IEssentiaStorageChannel && essentiaAdapter != null) {
+        if (essentiaAdapter != null && "thaumicenergistics.api.storage.IEssentiaStorageChannel".equals(channelName)) {
             return Collections.singletonList(essentiaAdapter);
         }
         // 外部扩展适配器（通过反射匹配 channel 类型，方法已缓存）
