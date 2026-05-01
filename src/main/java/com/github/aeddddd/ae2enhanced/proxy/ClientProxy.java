@@ -60,6 +60,13 @@ public class ClientProxy extends CommonProxy {
         registerBlockItemModel(ModBlocks.HYPERDIMENSIONAL_CASING);
         registerBlockItemModel(ModBlocks.HYPERDIMENSIONAL_SINGULARITY_CORE);
 
+        // 第三阶段：超因果计算核心
+        registerBlockItemModel(ModBlocks.COMPUTATION_CORE);
+        registerBlockItemModel(ModBlocks.CONSTANT_TENSOR_FIELD_CASING);
+        registerBlockItemModel(ModBlocks.CONSTANT_SPINOR_FIELD_CASING);
+        registerBlockItemModel(ModBlocks.CAUSAL_ANCHOR_CORE);
+        registerBlockItemModel(ModBlocks.SUPER_CRAFTING_INTERFACE);
+
         // 注册升级卡的所有模型 variant
         ModelLoader.registerItemVariants(ModItems.UPGRADE_CARD,
             new ModelResourceLocation(AE2Enhanced.MOD_ID + ":upgrade_card", "inventory"),

@@ -102,4 +102,10 @@ tile.ae2enhanced.hyperdimensional_me_interface.name=仓储中枢 ME 接口
 tile.ae2enhanced.hyperdimensional_casing.name=仓储中枢度规稳定锚
 tile.ae2enhanced.hyperdimensional_singularity_core.name=仓储中枢裸奇点核心
 
+tile.ae2enhanced.computation_core.name=超因果计算核心
+tile.ae2enhanced.constant_tensor_field_casing.name=恒定张量场外壳
+tile.ae2enhanced.constant_spinor_field_casing.name=恒定旋量场外壳
+tile.ae2enhanced.causal_anchor_core.name=因果锚定核心
+tile.ae2enhanced.super_crafting_interface.name=超因果合成接口
+
 death.spacetime.blackHole=%1$s 永远的迷失在事件视界中

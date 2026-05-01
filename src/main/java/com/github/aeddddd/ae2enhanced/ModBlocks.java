@@ -7,6 +7,7 @@ import com.github.aeddddd.ae2enhanced.tile.TileAssemblyMeInterface;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalMeInterface;
 import com.github.aeddddd.ae2enhanced.tile.TileMicroSingularity;
+import com.github.aeddddd.ae2enhanced.tile.TileComputationCore;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.creativetab.CreativeTabs;
@@ -31,6 +32,13 @@ public class ModBlocks {
     public static BlockHyperdimensionalCasing HYPERDIMENSIONAL_CASING;
     public static BlockHyperdimensionalSingularityCore HYPERDIMENSIONAL_SINGULARITY_CORE;
 
+    // 第三阶段：超因果计算核心
+    public static BlockComputationCore COMPUTATION_CORE;
+    public static BlockConstantTensorFieldCasing CONSTANT_TENSOR_FIELD_CASING;
+    public static BlockConstantSpinorFieldCasing CONSTANT_SPINOR_FIELD_CASING;
+    public static BlockCausalAnchorCore CAUSAL_ANCHOR_CORE;
+    public static BlockSuperCraftingInterface SUPER_CRAFTING_INTERFACE;
+
     public static void init() {
     }
 
@@ -46,7 +54,12 @@ public class ModBlocks {
             HYPERDIMENSIONAL_CONTROLLER = new BlockHyperdimensionalController(),
             HYPERDIMENSIONAL_ME_INTERFACE = new BlockHyperdimensionalMeInterface(),
             HYPERDIMENSIONAL_CASING = new BlockHyperdimensionalCasing(),
-            HYPERDIMENSIONAL_SINGULARITY_CORE = new BlockHyperdimensionalSingularityCore()
+            HYPERDIMENSIONAL_SINGULARITY_CORE = new BlockHyperdimensionalSingularityCore(),
+            COMPUTATION_CORE = new BlockComputationCore(),
+            CONSTANT_TENSOR_FIELD_CASING = new BlockConstantTensorFieldCasing(),
+            CONSTANT_SPINOR_FIELD_CASING = new BlockConstantSpinorFieldCasing(),
+            CAUSAL_ANCHOR_CORE = new BlockCausalAnchorCore(),
+            SUPER_CRAFTING_INTERFACE = new BlockSuperCraftingInterface()
         );
 
         GameRegistry.registerTileEntity(TileAssemblyController.class, AE2Enhanced.MOD_ID + ":assembly_controller");
@@ -54,6 +67,7 @@ public class ModBlocks {
         GameRegistry.registerTileEntity(TileMicroSingularity.class, AE2Enhanced.MOD_ID + ":micro_singularity");
         GameRegistry.registerTileEntity(TileHyperdimensionalController.class, AE2Enhanced.MOD_ID + ":hyperdimensional_controller");
         GameRegistry.registerTileEntity(TileHyperdimensionalMeInterface.class, AE2Enhanced.MOD_ID + ":hyperdimensional_me_interface");
+        GameRegistry.registerTileEntity(TileComputationCore.class, AE2Enhanced.MOD_ID + ":computation_core");
     }
 
     @SubscribeEvent
@@ -68,7 +82,12 @@ public class ModBlocks {
             new ItemBlock(HYPERDIMENSIONAL_CONTROLLER).setRegistryName(HYPERDIMENSIONAL_CONTROLLER.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
             new ItemBlock(HYPERDIMENSIONAL_ME_INTERFACE).setRegistryName(HYPERDIMENSIONAL_ME_INTERFACE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
             new ItemBlock(HYPERDIMENSIONAL_CASING).setRegistryName(HYPERDIMENSIONAL_CASING.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
-            new ItemBlock(HYPERDIMENSIONAL_SINGULARITY_CORE).setRegistryName(HYPERDIMENSIONAL_SINGULARITY_CORE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS)
+            new ItemBlock(HYPERDIMENSIONAL_SINGULARITY_CORE).setRegistryName(HYPERDIMENSIONAL_SINGULARITY_CORE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
+            new ItemBlock(COMPUTATION_CORE).setRegistryName(COMPUTATION_CORE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
+            new ItemBlock(CONSTANT_TENSOR_FIELD_CASING).setRegistryName(CONSTANT_TENSOR_FIELD_CASING.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
+            new ItemBlock(CONSTANT_SPINOR_FIELD_CASING).setRegistryName(CONSTANT_SPINOR_FIELD_CASING.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
+            new ItemBlock(CAUSAL_ANCHOR_CORE).setRegistryName(CAUSAL_ANCHOR_CORE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS),
+            new ItemBlock(SUPER_CRAFTING_INTERFACE).setRegistryName(SUPER_CRAFTING_INTERFACE.getRegistryName()).setCreativeTab(CreativeTabs.BUILDING_BLOCKS)
         );
     }
 }
