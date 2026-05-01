@@ -977,11 +977,7 @@ public class SupercausalStructure {
      * ��ʽ��1024 + floor(causalCount / 21) * 1024������ 16384
      */
     public static int computeParallel(int causalCount) {
-        int base = AE2EnhancedConfig.crafting.baseParallel;
-        int step = AE2EnhancedConfig.crafting.parallelPerAnchorCount;
-        int max = AE2EnhancedConfig.crafting.maxParallel;
-        int extra = (causalCount / step) * 1024;
-        return Math.min(max, base + extra);
+        return AE2EnhancedConfig.crafting.maxParallel;
     }
 
     public static void assemble(World world, BlockPos controllerPos) {
@@ -1005,6 +1001,117 @@ public class SupercausalStructure {
                 (com.github.aeddddd.ae2enhanced.tile.TileComputationCore) te;
             tile.disassemble();
         }
+    }
+
+    /**
+     * Creative mode: place all missing blocks instantly.
+     */
+    public static void placeMissingBlocks(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
+        if (world.isRemote) return;
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+
+        placeBlocks(world, controllerPos, TENSOR_CASING_SET, ModBlocks.CONSTANT_TENSOR_FIELD_CASING, facing);
+        placeBlocks(world, controllerPos, CAUSAL_ANCHOR_SET, ModBlocks.CAUSAL_ANCHOR_CORE, facing);
+        placeBlocks(world, controllerPos, SPINOR_CASING_SET, ModBlocks.CONSTANT_SPINOR_FIELD_CASING, facing);
+
+        BlockPos meInterfacePos = controllerPos.add(rotate(ME_INTERFACE_REL, facing));
+        if (world.getBlockState(meInterfacePos).getBlock() != ModBlocks.SUPER_CRAFTING_INTERFACE) {
+            world.setBlockState(meInterfacePos, ModBlocks.SUPER_CRAFTING_INTERFACE.getDefaultState());
+        }
+
+        assemble(world, controllerPos);
+    }
+
+    private static void placeBlocks(World world, BlockPos controllerPos, Set<BlockPos> set, Block block, EnumFacing facing) {
+        for (BlockPos rel : set) {
+            BlockPos pos = controllerPos.add(rotate(rel, facing));
+            if (world.getBlockState(pos).getBlock() != block) {
+                world.setBlockState(pos, block.getDefaultState());
+            }
+        }
+    }
+
+    /**
+     * Survival mode: check inventory, consume materials, place missing blocks.
+     * @return true if successful
+     */
+    public static boolean tryConsumeAndPlace(World world, BlockPos controllerPos, net.minecraft.entity.player.EntityPlayer player) {
+        if (world.isRemote) return false;
+        EnumFacing facing = getControllerFacing(world, controllerPos);
+
+        Map<Block, Integer> missing = new LinkedHashMap<>();
+        for (BlockPos rel : TENSOR_CASING_SET) {
+            BlockPos actual = controllerPos.add(rotate(rel, facing));
+            if (!world.isBlockLoaded(actual)) continue;
+            if (world.getBlockState(actual).getBlock() != ModBlocks.CONSTANT_TENSOR_FIELD_CASING) {
+                missing.put(ModBlocks.CONSTANT_TENSOR_FIELD_CASING, missing.getOrDefault(ModBlocks.CONSTANT_TENSOR_FIELD_CASING, 0) + 1);
+            }
+        }
+        for (BlockPos rel : CAUSAL_ANCHOR_SET) {
+            BlockPos actual = controllerPos.add(rotate(rel, facing));
+            if (!world.isBlockLoaded(actual)) continue;
+            if (world.getBlockState(actual).getBlock() != ModBlocks.CAUSAL_ANCHOR_CORE) {
+                missing.put(ModBlocks.CAUSAL_ANCHOR_CORE, missing.getOrDefault(ModBlocks.CAUSAL_ANCHOR_CORE, 0) + 1);
+            }
+        }
+        for (BlockPos rel : SPINOR_CASING_SET) {
+            BlockPos actual = controllerPos.add(rotate(rel, facing));
+            if (!world.isBlockLoaded(actual)) continue;
+            if (world.getBlockState(actual).getBlock() != ModBlocks.CONSTANT_SPINOR_FIELD_CASING) {
+                missing.put(ModBlocks.CONSTANT_SPINOR_FIELD_CASING, missing.getOrDefault(ModBlocks.CONSTANT_SPINOR_FIELD_CASING, 0) + 1);
+            }
+        }
+        BlockPos meInterfacePos = controllerPos.add(rotate(ME_INTERFACE_REL, facing));
+        if (world.isBlockLoaded(meInterfacePos) && world.getBlockState(meInterfacePos).getBlock() != ModBlocks.SUPER_CRAFTING_INTERFACE) {
+            missing.put(ModBlocks.SUPER_CRAFTING_INTERFACE, missing.getOrDefault(ModBlocks.SUPER_CRAFTING_INTERFACE, 0) + 1);
+        }
+
+        if (missing.isEmpty()) {
+            assemble(world, controllerPos);
+            return true;
+        }
+
+        net.minecraft.entity.player.InventoryPlayer inv = player.inventory;
+        Map<Block, Integer> needed = new LinkedHashMap<>(missing);
+
+        for (net.minecraft.item.ItemStack stack : inv.mainInventory) {
+            if (stack.isEmpty()) continue;
+            for (Map.Entry<Block, Integer> entry : needed.entrySet()) {
+                Block block = entry.getKey();
+                if (stack.getItem() == net.minecraft.item.Item.getItemFromBlock(block)) {
+                    int need = entry.getValue();
+                    int have = stack.getCount();
+                    if (have >= need) {
+                        entry.setValue(0);
+                    } else {
+                        entry.setValue(need - have);
+                    }
+                    break;
+                }
+            }
+        }
+
+        for (int count : needed.values()) {
+            if (count > 0) return false;
+        }
+
+        // Consume materials
+        for (Map.Entry<Block, Integer> entry : missing.entrySet()) {
+            Block block = entry.getKey();
+            int remaining = entry.getValue();
+            net.minecraft.item.Item item = net.minecraft.item.Item.getItemFromBlock(block);
+            for (int i = 0; i < inv.mainInventory.size() && remaining > 0; i++) {
+                net.minecraft.item.ItemStack stack = inv.mainInventory.get(i);
+                if (stack.getItem() == item) {
+                    int take = Math.min(stack.getCount(), remaining);
+                    int removed = inv.decrStackSize(i, take).getCount();
+                    remaining -= removed;
+                }
+            }
+        }
+
+        placeMissingBlocks(world, controllerPos, player);
+        return true;
     }
 
     public static class ValidationResult {

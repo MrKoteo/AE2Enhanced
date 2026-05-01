@@ -3,9 +3,11 @@ package com.github.aeddddd.ae2enhanced.gui;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyFormed;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyPattern;
 import com.github.aeddddd.ae2enhanced.container.ContainerAssemblyUnformed;
+import com.github.aeddddd.ae2enhanced.container.ContainerComputationUnformed;
 import com.github.aeddddd.ae2enhanced.container.ContainerHyperdimensionalNexus;
 import com.github.aeddddd.ae2enhanced.container.ContainerHyperdimensionalUnformed;
 import com.github.aeddddd.ae2enhanced.tile.TileAssemblyController;
+import com.github.aeddddd.ae2enhanced.tile.TileComputationCore;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
@@ -19,6 +21,8 @@ public class GuiHandler implements IGuiHandler {
     public static final int GUI_ASSEMBLY_PATTERN = 1;
     public static final int GUI_HYPERDIMENSIONAL_NEXUS = 2;
     public static final int GUI_HYPERDIMENSIONAL_UNFORMED = 3;
+    public static final int GUI_COMPUTATION_FORMED = 4;
+    public static final int GUI_COMPUTATION_UNFORMED = 5;
 
     /** 编码页码到 GUI ID：低4位为 base ID，bit8-15为页码，bit16-20为 patternPages */
     public static int encodePatternId(int page, int patternPages) {
@@ -87,6 +91,13 @@ public class GuiHandler implements IGuiHandler {
                 return new GuiHyperdimensionalNexus(tile);
             } else if (ID == GUI_HYPERDIMENSIONAL_UNFORMED) {
                 return new GuiHyperdimensionalUnformed(player.inventory, tile);
+            }
+        } else if (te instanceof TileComputationCore) {
+            TileComputationCore tile = (TileComputationCore) te;
+            if (ID == GUI_COMPUTATION_FORMED) {
+                return new GuiComputationFormed(tile);
+            } else if (ID == GUI_COMPUTATION_UNFORMED) {
+                return new GuiComputationUnformed(player.inventory, tile);
             }
         }
         return null;

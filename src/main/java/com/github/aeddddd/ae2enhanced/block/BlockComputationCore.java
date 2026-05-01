@@ -1,6 +1,7 @@
 package com.github.aeddddd.ae2enhanced.block;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.gui.GuiHandler;
 import com.github.aeddddd.ae2enhanced.structure.ComputationCoreIndex;
 import com.github.aeddddd.ae2enhanced.structure.SupercausalStructure;
 import com.github.aeddddd.ae2enhanced.tile.TileComputationCore;
@@ -102,15 +103,15 @@ public class BlockComputationCore extends Block {
             TileEntity te = world.getTileEntity(pos);
             if (te instanceof TileComputationCore) {
                 TileComputationCore tile = (TileComputationCore) te;
-                // 尝试结构验证
                 if (!tile.isFormed()) {
                     SupercausalStructure.ValidationResult result = SupercausalStructure.validate(world, pos);
                     if (result.passed) {
-                        tile.setFormed(true);
-                        // TODO: 通知 TileEntity 并行上限 result.parallelLimit
+                        SupercausalStructure.assemble(world, pos);
                     }
+                    player.openGui(AE2Enhanced.instance, GuiHandler.GUI_COMPUTATION_UNFORMED, world, pos.getX(), pos.getY(), pos.getZ());
+                } else {
+                    player.openGui(AE2Enhanced.instance, GuiHandler.GUI_COMPUTATION_FORMED, world, pos.getX(), pos.getY(), pos.getZ());
                 }
-                // TODO: 打开 GUI（已形成/未形成）
             }
         }
         return true;
