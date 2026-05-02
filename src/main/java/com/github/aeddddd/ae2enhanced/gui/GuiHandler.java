@@ -64,6 +64,14 @@ public class GuiHandler implements IGuiHandler {
                 return new ContainerHyperdimensionalNexus();
             }
             return null;
+        } else if (te instanceof TileComputationCore) {
+            TileComputationCore tile = (TileComputationCore) te;
+            if (ID == GUI_COMPUTATION_UNFORMED && !tile.isFormed()) {
+                return new ContainerComputationUnformed(player.inventory, tile);
+            } else if (ID == GUI_COMPUTATION_FORMED && tile.isFormed()) {
+                return new ContainerHyperdimensionalNexus(); // Dummy container for pure-display GUI
+            }
+            return null;
         }
         return null;
     }
