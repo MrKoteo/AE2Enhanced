@@ -1,27 +1,28 @@
 package com.github.aeddddd.ae2enhanced.mixin;
 
+import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
-import org.objectweb.asm.tree.ClassNode;
 
 import java.util.List;
 import java.util.Set;
 
 /**
- * Legacy Mekanism machine output redirect mixin config plugin.
+ * Mekanism CE Unofficial v10 machine output redirect mixin config plugin.
  */
-public class MekanismMixinPlugin implements IMixinConfigPlugin {
+public class MekanismV10MixinPlugin implements IMixinConfigPlugin {
 
-    private boolean legacyMekanismLoaded = false;
+    private boolean mekanismV10Loaded;
 
     @Override
     public void onLoad(String mixinPackage) {
         try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            java.net.URL ejector = cl.getResource("mekanism/common/tile/component/TileComponentEjector.class");
-            java.net.URL v10Api = cl.getResource("mekanism/api/fluid/IExtendedFluidTank.class");
-            legacyMekanismLoaded = ejector != null && v10Api == null;
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            mekanismV10Loaded = loader != null
+                    && loader.getResource("mekanism/common/tile/component/TileComponentEjector.class") != null
+                    && loader.getResource("mekanism/api/fluid/IExtendedFluidTank.class") != null;
         } catch (Exception ignored) {
+            mekanismV10Loaded = false;
         }
     }
 
@@ -32,7 +33,7 @@ public class MekanismMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return legacyMekanismLoaded;
+        return mekanismV10Loaded;
     }
 
     @Override
