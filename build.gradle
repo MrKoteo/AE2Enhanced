@@ -55,55 +55,96 @@ repositories {
     mavenCentral()
     maven { url = 'https://repo.spongepowered.org/repository/maven-public/' } // Mixin
     maven { url = 'https://dvs1.progwml6.com/files/maven' }                   // JEI
-    maven { url = 'https://maven.blamejared.com' }                            // CraftTweaker
+    maven { url = 'https://maven.blamejared.com' }                            // CraftTweaker / Botania
+    maven { url = 'https://maven.cleanroommc.com' }                           // MixinBooter
+    maven { url = 'https://maven.modmuss50.me' }                              // TechReborn / RebornCore
+    maven { url = 'https://www.cursemaven.com' }                              // CurseForge mods (curse.maven:<slug>-<projectId>:<fileId>)
+
+    // GitHub Release 直链 (Ivy pattern layout, 仅构件无元数据; [revision] 映射到 release tag)
+    ivy {
+        name = 'GitHub-ae2uel'
+        url = 'https://github.com/AE2-UEL/Applied-Energistics-2/releases/download'
+        layout 'pattern', { artifact 'v[revision]/ae2-uel-v[revision].[ext]' }
+        metadataSources { artifact() }
+    }
+    ivy {
+        name = 'GitHub-thaumic-energistics'
+        url = 'https://github.com/Delfayne/ThaumicEnergistics/releases/download'
+        layout 'pattern', { artifact 'v[revision]/thaumic-energistics-extended-life-1.12.2-[revision].[ext]' }
+        metadataSources { artifact() }
+    }
+    ivy {
+        name = 'GitHub-cells'
+        url = 'https://github.com/Aedial/CELLS/releases/download'
+        layout 'pattern', { artifact '[revision]/cells-[revision].[ext]' }
+        metadataSources { artifact() }
+    }
+    ivy {
+        name = 'GitHub-cell-terminal'
+        url = 'https://github.com/Aedial/DiskTerminal/releases/download'
+        layout 'pattern', { artifact '[revision]/cell-terminal-[revision]-dev.[ext]' }
+        metadataSources { artifact() }
+    }
+    ivy {
+        name = 'GitHub-terminal-interaction-integration'
+        url = 'https://github.com/NNYYOONNIIOO/terminal_interaction_integration/releases/download'
+        layout 'pattern', { artifact '[revision]/terminal_interaction_integration-1.0.[ext]' }
+        metadataSources { artifact() }
+    }
 }
 
 // ----------------------------------------------------------------------------
 // 依赖
 // ----------------------------------------------------------------------------
 dependencies {
-    // 必需: AE2-UEL 主 mod
-    compile files('libs/ae2-uel-v0.56.7.jar')
+    compile 'ae2uel:ae2-uel:0.56.7'
 
     // 可选集成 (compileOnly): 第三方 mod 类一律通过反射隔离访问,
     // 运行时按对应 mod 是否安装进行条件加载
-    compileOnly files('libs/ae2fc-2.7.10-unofficial.jar')
-    compileOnly files('libs/Mekanism-CE-Unofficial-All-10.0.3.550-dev.jar')
-    compileOnly files('libs/Mekanism-1.12.2-9.8.3.390.jar')
-    compileOnly files('libs/MekanismEnergistics-0.1.5.jar')
-    compileOnly files('libs/Thaumcraft-1.12.2-6.1.BETA26.jar')
-    compileOnly files('libs/thaumic-energistics-extended-life-1.12.2-2.3.5.jar')
-    compileOnly files('libs/Baubles-1.12-1.5.2.jar')
-    compileOnly files('libs/Botania r1.10-364.4.jar')
-    compileOnly files('libs/terminal_interaction_integration-1.0.jar')
-    compileOnly files('libs/BloodMagic-1.12.2-2.4.3-105.jar')
-    compileOnly files('libs/ActuallyAdditions-1.12.2-r152.jar')
-    compileOnly files('libs/CoFHCore-1.12.2-4.6.6.1-universal.jar')
-    compileOnly files('libs/ThermalExpansion-1.12.2-5.5.7.1-universal.jar')
-    compileOnly files('libs/ThermalFoundation-1.12.2-2.6.7.1-universal.jar')
-    compileOnly files('libs/EnderIO-1.12.2-5.3.72.jar')
-    compileOnly files('libs/EnderCore-1.12.2-0.5.78.jar')
-    compileOnly files('libs/industrialforegoing-1.12.2-1.12.13-237.jar')
-    compileOnly files('libs/AutoSave-1.12.2-1.0.11.jar')
-    compileOnly files('libs/RebornCore-1.12.2-3.19.4.529-universal.jar')
-    compileOnly files('libs/TechReborn-1.12.2-2.27.3.1084-universal.jar')
-    compileOnly files('libs/nuclearcraft-1.12.2-2o.9.7.jar')
-    compileOnly files('libs/Draconic-Evolution-1.12.2-2.3.28.354-universal.jar')
-    compileOnly files('libs/extendedcrafting-nomifactory-edition-1.7.0.6.jar')
-    compileOnly files('libs/ProjectE-1.12.2-PE1.4.1.jar')
-    compileOnly files('libs/ModularMachinery-CE-2.2.2.jar')
-    compileOnly files('libs/StorageDrawers-1.12.2-5.5.0.jar')
-    compileOnly files('libs/cells-0.6.2-alpha3.jar')
-    compileOnly files('libs/cell-terminal-1.6.7-dev.jar')
 
-    // Mixin: MixinBooter 本地 jar + 注解处理器
-    compile files('libs/!mixinbooter-10.6.jar')
+    compileOnly files('libs/Mekanism-CE-Unofficial-All-10.0.3.550-dev.jar')
+
+    // --- CurseForge ---
+    compileOnly 'curse.maven:mekanism-268560:2835175'                                // Mekanism 9.8.3.390
+    compileOnly 'curse.maven:thaumcraft-223628:2629023'                              // Thaumcraft 6.1.BETA26
+    compileOnly 'curse.maven:baubles-227083:2518667'                                 // Baubles 1.5.2
+    compileOnly 'curse.maven:draconic-evolution-223565:3431261'                      // Draconic Evolution 2.3.28.354
+    compileOnly 'curse.maven:ender-io-64578:4674244'                                 // EnderIO 5.3.72
+    compileOnly 'curse.maven:endercore-231868:4671384'                               // EnderCore 0.5.78
+    compileOnly 'curse.maven:cofh-core-69162:2920433'                                // CoFHCore 4.6.6.1
+    compileOnly 'curse.maven:thermal-expansion-69163:2926431'                        // ThermalExpansion 5.5.7.1
+    compileOnly 'curse.maven:thermal-foundation-222880:2926428'                      // ThermalFoundation 2.6.7.1
+    compileOnly 'curse.maven:blood-magic-224791:2822288'                             // BloodMagic 2.4.3-105
+    compileOnly 'curse.maven:actually-additions-228404:3117927'                      // ActuallyAdditions r152
+    compileOnly 'curse.maven:nuclearcraft-overhauled-336895:8197222'                 // NuclearCraft: Overhauled 2o.9.7
+    compileOnly 'curse.maven:storage-drawers-223852:4655859'                         // StorageDrawers 5.5.0
+    compileOnly 'curse.maven:projecte-226410:2702991'                                // ProjectE PE1.4.1
+    compileOnly 'curse.maven:industrial-foregoing-266515:2745321'                    // IndustrialForegoing 1.12.13-237
+    compileOnly 'curse.maven:ae2fluidcraft-rework-unofficial-1404390:7742544'        // ae2fc 2.7.10-unofficial
+    compileOnly 'curse.maven:mekanism-energistics-1027681:5775101'                   // MekanismEnergistics 0.1.5
+    compileOnly 'curse.maven:modularmachinery-community-edition-817377:6945422'      // ModularMachinery-CE 2.2.2
+    compileOnly 'curse.maven:extended-crafting-nomifactory-edition-398267:4592627'   // ExtendedCrafting Nomifactory 1.7.0.6
+    compileOnly 'curse.maven:functionalstoragelegacy-1481727:8081067'                // FunctionalStorageLegacy 1.0.3-beta
+
+    // --- GitHub Release ---
+    compileOnly 'thaumicenergistics:thaumic-energistics:2.3.5'                       // ThaumicEnergistics Extended Life
+    compileOnly 'cells:cells:0.6.2-alpha3'
+    compileOnly 'cellterminal:cell-terminal:1.6.7'
+    compileOnly 'tii:terminal-interaction-integration:1.0.0'
+
+    // --- 公共 Maven  ---
+    compileOnly('vazkii.botania:Botania:r1.10-364.4') { transitive = false }
+    compileOnly('TechReborn:TechReborn-1.12.2:2.27.3.1084:universal') { transitive = false }
+    compileOnly('RebornCore:RebornCore-1.12.2:3.19.4.529:universal') { transitive = false }
+
+    // Mixin: MixinBooter + 注解处理器
+    compile('zone.rong:mixinbooter:10.6') { transitive = false }
     annotationProcessor "org.spongepowered:mixin:${project.mixin_version}:processor"
 
-    // fastutil: 高性能集合库, 打包进 jar (瘦身规则见下方 jar 块)
+    // fastutil
     compile "it.unimi.dsi:fastutil:${project.fastutil_version}"
 
-    // JEI / CraftTweaker: 开发期反混淆依赖, 不打包
+    // JEI / CraftTweaker
     deobfProvided "mezz.jei:jei_${project.minecraft_version}:${project.jei_version}:api"
     deobfProvided "mezz.jei:jei_${project.minecraft_version}:${project.jei_version}"
     deobfProvided "CraftTweaker2:CraftTweaker2-MC1120-Main:${project.crafttweaker_version}"
@@ -139,18 +180,23 @@ def specialSourceJar = "${gradle.gradleUserHomeDir}/caches/forge_gradle/maven_do
 def ae2McpJar = file("$buildDir/testLibs/ae2-uel-mcp.jar")
 
 task remapAe2ForTest(type: JavaExec) {
-    inputs.file 'libs/ae2-uel-v0.56.7.jar'
+    // AE2-UEL 构件经 Ivy 直链解析进 Gradle 缓存, 在执行期定位实际文件
     inputs.file srgToMcpSrg
     outputs.file ae2McpJar
+    outputs.upToDateWhen { ae2McpJar.exists() }
     main = 'net.md_5.specialsource.SpecialSource'
     classpath = files(specialSourceJar)
-    args = ['-i', 'libs/ae2-uel-v0.56.7.jar', '-o', ae2McpJar.absolutePath, '-m', srgToMcpSrg]
+    doFirst {
+        def ae2Jar = configurations.compile.find { it.name.startsWith('ae2-uel') }
+        assert ae2Jar != null: 'AE2-UEL artifact not found in compile configuration'
+        args = ['-i', ae2Jar.absolutePath, '-o', ae2McpJar.absolutePath, '-m', srgToMcpSrg]
+    }
 }
 
 afterEvaluate {
     // 以 MCP 重映射版替换 test 运行时 classpath 中的 SRG 版 AE2 jar
     sourceSets.test.runtimeClasspath = sourceSets.test.runtimeClasspath
-            .filter { it.name != 'ae2-uel-v0.56.7.jar' } + files(ae2McpJar)
+            .filter { !it.name.startsWith('ae2-uel') } + files(ae2McpJar)
 }
 
 mixin {
