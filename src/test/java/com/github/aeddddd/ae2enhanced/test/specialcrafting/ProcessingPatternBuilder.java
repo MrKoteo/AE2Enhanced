@@ -21,9 +21,16 @@ public class ProcessingPatternBuilder {
 
     private final IAEItemStack[] outputs;
     private final List<IAEItemStack> inputs = new ArrayList<>();
+    private int priority;
 
     public ProcessingPatternBuilder(IAEItemStack... outputs) {
         this.outputs = outputs.clone();
+    }
+
+    /** 设置样板优先级（AE2-UEL:getCraftingFor 按优先级降序）. */
+    public ProcessingPatternBuilder withPriority(int priority) {
+        this.priority = priority;
+        return this;
     }
 
     /**
@@ -39,6 +46,7 @@ public class ProcessingPatternBuilder {
     public ICraftingPatternDetails build() {
         final IAEItemStack[] condensedInputs = condense(this.inputs);
         final IAEItemStack[] condensedOutputs = condense(java.util.Arrays.asList(this.outputs));
+        final int priority = this.priority;
         return new ICraftingPatternDetails() {
             @Override
             public ItemStack getPattern() {
@@ -87,7 +95,7 @@ public class ProcessingPatternBuilder {
 
             @Override
             public int getPriority() {
-                return 0;
+                return priority;
             }
 
             @Override

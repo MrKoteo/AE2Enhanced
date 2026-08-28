@@ -559,6 +559,22 @@ public final class CycleAnalyzer {
             minPrefix[j] = BigInteger.ZERO;
         }
         for (int i = 0; i < n; i++) {
+            // 自引用步骤(同键既有输入又有产出,如 1A+1B→2A)的批量模拟先总额提取
+            // 自我输入、后才注入产出——前缀种子必须覆盖该毛额瞬时下探,否则净额入账
+            // 会低估水位,批量提取时库存不足,而原生 notRecursive 排除祖先样板,
+            // 子节点无可用样板只能误记缺料
+            ICraftingPatternDetails pattern = steps.get(i).pattern();
+            for (int j = 0; j < n; j++) {
+                long selfIn = grossSelfInput(pattern, keys.get(j));
+                if (selfIn <= 0) {
+                    continue;
+                }
+                BigInteger dip = balancePrefix[j]
+                        .subtract(BigInteger.valueOf(selfIn).multiply(times[i]));
+                if (dip.compareTo(minPrefix[j]) < 0) {
+                    minPrefix[j] = dip;
+                }
+            }
             for (int j = 0; j < n; j++) {
                 balancePrefix[j] = balancePrefix[j].add(coeff[i][j].multiply(times[i]));
                 if (balancePrefix[j].compareTo(minPrefix[j]) < 0) {
@@ -595,6 +611,30 @@ public final class CycleAnalyzer {
         } catch (ArithmeticException e) {
             return null; // 超出 long → 不接管
         }
+    }
+
+    /**
+     * 样板对某键的"自我输入毛额":该键同时出现在样板的输入与输出中时返回输入量,
+     * 否则返回 0(纯消费键的提取量已被净额前缀完整覆盖).
+     */
+    private static long grossSelfInput(ICraftingPatternDetails pattern, IAEItemStack key) {
+        long in = 0;
+        for (IAEItemStack input : pattern.getCondensedInputs()) {
+            if (input != null && input.getStackSize() > 0
+                    && key.equals(RecursiveCraftingHelper.canon(input))) {
+                in += input.getStackSize();
+            }
+        }
+        if (in <= 0) {
+            return 0;
+        }
+        for (IAEItemStack output : pattern.getCondensedOutputs()) {
+            if (output != null && output.getStackSize() > 0
+                    && key.equals(RecursiveCraftingHelper.canon(output))) {
+                return in;
+            }
+        }
+        return 0;
     }
 
     /**

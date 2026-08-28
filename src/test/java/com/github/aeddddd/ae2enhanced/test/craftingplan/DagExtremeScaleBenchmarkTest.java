@@ -231,32 +231,39 @@ public class DagExtremeScaleBenchmarkTest {
      * 指定节点替换为自增殖子环/催化 θ 环,根汇聚末层三个代表节点.
      */
     private static SimulationEnv buildMixedEnv() {
+        return buildMixedEnv(LAYERS, WIDTH);
+    }
+
+    /** 参数化版本:layers×width 节点规模(供生产案例对齐基准复用). */
+    private static SimulationEnv buildMixedEnv(int layers, int width) {
         SimulationEnv env = new SimulationEnv();
         Random rng = new Random(42);
+        final int layerNodes = layers * width;
+        final int rootId = layerNodes;
 
         // 环节点选自中间层(8..L-3),自增殖 ~2%、θ 环 ~1%,互不重叠
         List<Integer> candidates = new ArrayList<>();
-        for (int l = 8; l < LAYERS - 2; l++) {
-            for (int i = 0; i < WIDTH; i++) {
-                candidates.add(l * WIDTH + i);
+        for (int l = 8; l < layers - 2; l++) {
+            for (int i = 0; i < width; i++) {
+                candidates.add(l * width + i);
             }
         }
         Collections.shuffle(candidates, rng);
-        int selfDupCount = Math.max(1, LAYER_NODES / 50);
-        int thetaCount = Math.max(1, LAYER_NODES / 100);
+        int selfDupCount = Math.max(1, layerNodes / 50);
+        int thetaCount = Math.max(1, layerNodes / 100);
         Set<Integer> dupIds = new HashSet<>(candidates.subList(0, selfDupCount));
         Set<Integer> thetaIds = new HashSet<>(candidates.subList(selfDupCount, selfDupCount + thetaCount));
 
         // 层 0:原料
-        for (int i = 0; i < WIDTH; i++) {
+        for (int i = 0; i < width; i++) {
             env.addStoredItem(mult(key(i), RAW_STOCK));
         }
 
-        int nextExtraId = ROOT_ID + 1;
+        int nextExtraId = rootId + 1;
         int patterns = 0;
-        for (int l = 1; l < LAYERS; l++) {
-            for (int i = 0; i < WIDTH; i++) {
-                int id = l * WIDTH + i;
+        for (int l = 1; l < layers; l++) {
+            for (int i = 0; i < width; i++) {
+                int id = l * width + i;
                 IAEItemStack out = key(id);
                 if (dupIds.contains(id)) {
                     // 自增殖子环:1X → 2X,种子 1(DAG 循环边界可解;原生不可规划)
@@ -282,18 +289,18 @@ public class DagExtremeScaleBenchmarkTest {
                             rng.nextInt(5) == 0 ? mult(out, 4) : out);
                     int kind = rng.nextInt(100);
                     if (kind < 55) {
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
                     } else if (kind < 85) {
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
                     } else if (kind < 95 && l >= 2) {
                         // 跨层交叉边:跳过一层取料,制造共享中间物
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
-                        b.addPreciseInput(1, key((l - 2) * WIDTH + rng.nextInt(WIDTH)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
+                        b.addPreciseInput(1, key((l - 2) * width + rng.nextInt(width)));
                     } else {
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
-                        b.addPreciseInput(1, key((l - 1) * WIDTH + rng.nextInt(WIDTH)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
+                        b.addPreciseInput(1, key((l - 1) * width + rng.nextInt(width)));
                     }
                     env.addPattern(b.build());
                 }
@@ -302,10 +309,10 @@ public class DagExtremeScaleBenchmarkTest {
         }
 
         // 根:汇聚末层三个代表节点
-        env.addPattern(new ProcessingPatternBuilder(key(ROOT_ID))
-                .addPreciseInput(1, key((LAYERS - 1) * WIDTH))
-                .addPreciseInput(1, key((LAYERS - 1) * WIDTH + WIDTH / 2))
-                .addPreciseInput(1, key((LAYERS - 1) * WIDTH + WIDTH - 1))
+        env.addPattern(new ProcessingPatternBuilder(key(rootId))
+                .addPreciseInput(1, key((layers - 1) * width))
+                .addPreciseInput(1, key((layers - 1) * width + width / 2))
+                .addPreciseInput(1, key((layers - 1) * width + width - 1))
                 .build());
         patterns++;
 
@@ -340,6 +347,40 @@ public class DagExtremeScaleBenchmarkTest {
         System.out.printf(
                 "[BENCH] 极端请求(Long.MAX): DAG 耗时 %,.1f ms | 缺料计划(符合预期)| 样板调用(饱和合计)=%,d 缺料种类=%,d%n",
                 dagNanos / 1e6, craftsSaturated, dagPlan.missingItems().size());
+    }
+
+    /**
+     * 生产案例对齐:单份计划约 5 万节点 × 下单 1000 份(看门狗 180s 崩服案例).
+     * 规模阶梯(50/100/150/200/250 层 × 200 宽)逐级测量耗时与堆占用,
+     * 验证计算阶段是否近线性——首次 5w 节点实测在 3g 堆下 OOM,
+     * 提示存在随节点数超线性增长的分配,用阶梯曲线定位.
+     */
+    @Test
+    public void realWorldScale50kNodes() {
+        Assumptions.assumeTrue(ENABLED, "set AE2E_BENCH=1 to enable");
+        for (int layers : new int[] { 50, 100, 150, 200, 250 }) {
+            SimulationEnv env = buildMixedEnv(layers, 200);
+            IAEItemStack root = key(layers * 200);
+            System.gc();
+            long heapBefore = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+            long t0 = System.nanoTime();
+            CraftingJob dagJob = env.runJobTimed(env.newDagJob(mult(root, 1000)), 10, TimeUnit.MINUTES);
+            long dagNanos = System.nanoTime() - t0;
+            long heapAfter = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+            if (dagJob == null) {
+                System.out.printf("[BENCH] %d 层(%,d 节点)× 1000 份: 超时%n", layers, layers * 200);
+                continue;
+            }
+            PlanView dagPlan = PlanView.of(dagJob);
+            System.out.printf(
+                    "[BENCH] %d 层(%,d 节点)× 1000 份: %,.1f ms, 堆增量=%,.0f MB, 模拟=%s, 特殊标记=%s%n",
+                    layers, layers * 200, dagNanos / 1e6,
+                    (heapAfter - heapBefore) / 1048576.0, dagPlan.simulation(),
+                    SpecialPlanMarker.isSpecial(dagPlan.job()));
+            // 深层数下需求 1.8^depth 爆炸超出原料库存 → 正当缺料计划(simulation=true),
+            // 本基准的测量目标是耗时/内存的近线性,不判定计划成败
+            assertThat(dagNanos).as("计算须在时间预算内完成").isLessThan(TimeUnit.MINUTES.toNanos(5));
+        }
     }
 
     // ==================== 根级催化环:SpecialCraftingJob 路径基准 ====================

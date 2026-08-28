@@ -6,11 +6,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import appeng.api.networking.pathing.IPathingGrid;
 import appeng.core.AEConfig;
 import appeng.core.features.AEFeature;
 import appeng.me.GridConnection;
 import appeng.me.GridNode;
 import appeng.me.pathfinding.IPathItem;
+import com.github.aeddddd.ae2enhanced.mixin.late.accessor.IGridNodeAccessor;
+import com.github.aeddddd.ae2enhanced.pathing.GridValidationBatcher;
 import com.github.aeddddd.ae2enhanced.pathing.IEnhancedPathItem;
 
 /**
@@ -87,5 +90,25 @@ public abstract class MixinGridConnection implements IEnhancedPathItem {
             this.usedChannels = 0;
             this.lastUsedChannels = 0;
         }
+    }
+
+    /**
+     * GridNode.destroy() 批处理期间：跳过每条连接销毁时的双侧 validateGrid 全图 BFS，
+     * 改为登记到 GridValidationBatcher，待全部连接销毁后统一做一次分裂检测。
+     * 非批处理场景（如变色断开的单条连接）保持原版行为。
+     */
+    @Inject(method = "destroy", at = @At("HEAD"), remap = false, cancellable = true)
+    private void ae2enhanced$deferValidation(CallbackInfo ci) {
+        if (!GridValidationBatcher.isBatching()) {
+            return;
+        }
+        GridConnection self = (GridConnection) (Object) this;
+        IPathingGrid p = (IPathingGrid) this.sideA.getInternalGrid().getCache(IPathingGrid.class);
+        p.repath();
+        ((IGridNodeAccessor) this.sideA).ae2e$removeConnection(self);
+        ((IGridNodeAccessor) this.sideB).ae2e$removeConnection(self);
+        GridValidationBatcher.defer(this.sideA);
+        GridValidationBatcher.defer(this.sideB);
+        ci.cancel();
     }
 }

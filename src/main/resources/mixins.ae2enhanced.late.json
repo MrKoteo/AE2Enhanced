@@ -24,6 +24,7 @@
     "ae2.MixinCraftingCPUClusterBatch",
     "ae2.MixinCraftingCPUClusterVirtualBatch",
     "ae2.MixinCraftingCPUClusterRemaining",
+    "ae2.MixinCraftingCPUClusterPushCooldown",
     "ae2.MixinMolecularAssemblerRemaining",
     "ae2.MixinDualityInterface",
     "ae2.MixinCraftingGridCache",
@@ -43,8 +44,10 @@
     "upgrade.MixinUpgradeSlots",
     "accessor.INetworkMonitorAccessor",
     "accessor.IAEConfigAccessor",
+    "accessor.IGridNodeAccessor",
     "accessor.ICraftingCPUClusterAccessor",
     "accessor.ITaskProgressAccessor",
+    "accessor.IMultiCraftingTrackerAccessor",
     "accessor.IItemListAccessor",
     "accessor.IItemListIgnoreCraftingAccessor",
     "accessor.IItemVariantListAccessor"

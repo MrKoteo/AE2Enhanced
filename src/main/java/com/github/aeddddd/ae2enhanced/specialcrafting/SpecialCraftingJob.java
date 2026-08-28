@@ -41,9 +41,34 @@ import com.github.aeddddd.ae2enhanced.network.packet.PacketSpecialPlanInfo;
  * <p>特殊路径任何失败/异常都回落到原生 {@code super.run()},最坏情况退化为原版行为
  * （通常报缺料）,绝不产生错误计划.</p>
  */
-public class SpecialCraftingJob extends CraftingJob {
+public class SpecialCraftingJob extends CraftingJob
+        implements com.github.aeddddd.ae2enhanced.mixin.bridge.ICraftingJobBudgetAccess {
 
     private final World world;
+
+    /** 原生回落计算预算状态（MixinCraftingJob 的 handlePausing 心跳读取）. */
+    private long nativeCalcDeadlineNanos;
+    private boolean nativeCalcAborted;
+
+    @Override
+    public long ae2enhanced$nativeCalcDeadlineNanos() {
+        return this.nativeCalcDeadlineNanos;
+    }
+
+    @Override
+    public void ae2enhanced$armNativeCalcBudget(long deadlineNanos) {
+        this.nativeCalcDeadlineNanos = deadlineNanos;
+    }
+
+    @Override
+    public void ae2enhanced$markNativeCalcAborted() {
+        this.nativeCalcAborted = true;
+    }
+
+    @Override
+    public boolean ae2enhanced$nativeCalcAborted() {
+        return this.nativeCalcAborted;
+    }
 
     public SpecialCraftingJob(World w, IGrid grid, IActionSource actionSrc, IAEItemStack what,
             ICraftingCallback callback) {
@@ -60,7 +85,10 @@ public class SpecialCraftingJob extends CraftingJob {
             AE2Enhanced.LOGGER.warn("[特殊配方] 求解异常,回落原生计算: {}", t.toString());
         }
         if (!handled) {
+            // 回落原生:挂计算预算(病态计划的原生递归可能永不结束,见 NativeCalcBudget)
+            NativeCalcBudget.arm(this);
             super.run();
+            NativeCalcBudget.warnIfAborted(this);
         }
     }
 
@@ -100,12 +128,16 @@ public class SpecialCraftingJob extends CraftingJob {
         } catch (InterruptedException e) {
             // 与原生一致:取消即收尾,不再回落
             SpecialLog.info("[特殊配方] 计算被取消");
+            NativeCalcBudget.warnIfAborted(this);
             Ae2CraftingReflect.finish(this);
             return true;
         } catch (Throwable t) {
             AE2Enhanced.LOGGER.warn("[特殊配方] 求解异常,回落原生计算: {}", t.toString());
             Ae2CraftingReflect.setAvailableCheck(this, null);
-            return false;
+            NativeCalcBudget.arm(this);
+            super.run();
+            NativeCalcBudget.warnIfAborted(this);
+            return true;
         }
     }
 

@@ -1,6 +1,7 @@
 package com.github.aeddddd.ae2enhanced.mixin.late.ae2fc;
 
 import appeng.util.InventoryAdaptor;
+import com.github.aeddddd.ae2enhanced.integration.ae2fc.FluidAdaptorCache;
 import com.glodblock.github.inventory.FluidConvertingInventoryAdaptor;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;

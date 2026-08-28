@@ -30,6 +30,8 @@ public class LateMixinLoader implements ILateMixinLoader {
         ));
         if (!Ae2fcCompat.AE2FC_LOADED) {
             configs.add("mixins.ae2enhanced.late.fluid.json");
+            // ae2fc 缺失时接口热路径走原版 InventoryAdaptor.getAdaptor,启用其结果缓存
+            configs.add("mixins.ae2enhanced.late.vanillaadaptor.json");
         } else {
             configs.add("mixins.ae2enhanced.late.ae2fc.json");
         }

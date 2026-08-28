@@ -88,4 +88,53 @@ public final class NetworkEnergyApi {
             return 0;
         }
     }
+
+    /**
+     * 向宿主所在网络注入 RF.
+     *
+     * <p>与 AE2 存储语义一致，网络容量不足时可能发生部分注入，
+     * 返回值为实际注入的数量。需要"全有或全无"语义的调用方应先以
+     * {@code simulate=true} 确认可注入，再实际注入。</p>
+     *
+     * @param host     已接入网络的 AE 设备宿主
+     * @param amount   要注入的 RF 数量（必须 &gt; 0）
+     * @param simulate true = 仅模拟，不实际注入
+     * @return 实际（或模拟可）注入的 RF 数量
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static long insertEnergy(IActionHost host, long amount, boolean simulate) {
+        if (host == null || amount <= 0) {
+            return 0;
+        }
+        try {
+            IGridNode node = host.getActionableNode();
+            if (node == null) {
+                return 0;
+            }
+            IGrid grid = node.getGrid();
+            IStorageGrid storage = grid.getCache(IStorageGrid.class);
+            if (storage == null) {
+                return 0;
+            }
+            IStorageChannel channel = EnergyChannelResolver.getChannel();
+            if (channel == null) {
+                return 0;
+            }
+            IMEInventory inventory = storage.getInventory(channel);
+            if (inventory == null) {
+                return 0;
+            }
+            IAEStack request = EnergyChannelResolver.createStack(amount);
+            if (request == null) {
+                return 0;
+            }
+            IActionSource source = new MachineSource(host);
+            IAEStack notInjected = (IAEStack) inventory.injectItems(request,
+                    simulate ? Actionable.SIMULATE : Actionable.MODULATE, source);
+            return notInjected == null ? amount : amount - notInjected.getStackSize();
+        } catch (Exception e) {
+            // 节点未就绪（GridAccessException）或通道未注册等情况：静默视为不可注入
+            return 0;
+        }
+    }
 }

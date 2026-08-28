@@ -95,9 +95,6 @@ public final class DagExecutor {
         Map<DagGraph.DagNode, ParentSlot> cycleSlotByNode = new IdentityHashMap<>();
 
         // ==================== 阶段 1:结构物化(BFS,每节点挂一次) ====================
-        if (graph.root.kind == DagGraph.Kind.EMITTER) {
-            throw new DagFallback("emitter_root");
-        }
         Set<DagGraph.DagNode> attached = Collections.newSetFromMap(new IdentityHashMap<>());
         ArrayDeque<DagGraph.DagNode> queue = new ArrayDeque<>();
         ArrayDeque<CraftingTreeNode> parentQueue = new ArrayDeque<>();
@@ -146,7 +143,9 @@ public final class DagExecutor {
                             terminalSlotByNode.putIfAbsent(edge.child(), childTreeNode);
                             break;
                         case EMITTER:
-                            throw new DagFallback("emitter_node:" + edge.child().key);
+                            // 发射叶子:无样板分支(编译期对齐原生),阶段 2 提取后
+                            // 剩余量由发射满足——无需物化任何过程
+                            break;
                         default:
                             throw new DagFallback("unexpected_node_kind");
                     }
@@ -158,6 +157,8 @@ public final class DagExecutor {
         // ==================== 阶段 2:拓扑单趟记账 ====================
         Map<DagGraph.DagNode, Long> requests = new IdentityHashMap<>();
         requests.put(graph.root, target);
+        Map<DagGraph.DagNode, Long> subRequests = new IdentityHashMap<>(); // 经可替代边到达的需求
+        Map<DagGraph.DagNode, Set<IAEItemStack>> candidateIntersection = new IdentityHashMap<>(); // 候选交集
         Map<DagGraph.DagNode, Long> missingByNode = new IdentityHashMap<>();
         Map<IAEItemStack, Long> synthetic = new LinkedHashMap<>(); // 合成侧余额(产出+容器返还)
         Map<IAEItemStack, Long> fundedByCredit = new LinkedHashMap<>(); // 合成侧抵扣量(按 key)
@@ -201,23 +202,39 @@ public final class DagExecutor {
 
             // 提取:网络优先——物理实取记 used(执行期 CPU 仅吃 used 预取,
             // 返还物随合成渐进可用);实取不足的部分才由合成侧余额抵扣
-            // (与原生语义一致:原生计划层逐次建模容器返还,种子高水位 = 0~1)
-            long credited = synthetic.getOrDefault(node.key, 0L);
-            long realAvailable = Math.max(0L, invAmount(inv, node.key) - credited);
-            long extracted = extract(inv, node.key, need, src);
-            if (extracted > 0) {
-                long fromNetwork = Math.min(extracted, realAvailable);
-                long funded = extracted - fromNetwork;
-                if (funded > 0) {
-                    synthetic.merge(node.key, -funded, Long::sum);
-                    fundedByCredit.merge(node.key, funded, Long::sum);
-                }
-                if (fromNetwork > 0) {
-                    networkSourced.merge(node.key, fromNetwork, Long::sum);
-                    totalExtracted = SaturatedMath.add(totalExtracted, fromNetwork);
-                    IAEItemStack usedStack = node.key.copy();
-                    usedStack.setStackSize(fromNetwork);
-                    Ae2CraftingReflect.getNodeUsed(rootNode).add(usedStack);
+            // (与原生语义一致:原生计划层逐次建模容器返还,种子高水位 = 0~1).
+            // 需求拆分:经可替代边到达的部分先吃编码物库存、再吃候选库存
+            // (原生"替代仅作用于库存提取,合成仍走编码物");精确部分只吃编码物
+            // (执行有效性:精确父样板只接受编码物).候选取所有贡献边候选的交集——
+            // 并集可能含对某父样板无效的候选,执行层 canCraft 找不到会卡死任务
+            long subNeed = Math.min(need, subRequests.getOrDefault(node, 0L));
+            long preciseNeed = need - subNeed;
+            long extracted = 0;
+            if (preciseNeed > 0) {
+                ExtractOutcome outcome = extractCredited(node.key, preciseNeed, inv, synthetic,
+                        fundedByCredit, networkSourced, rootNode, src);
+                extracted += outcome.extracted;
+                totalExtracted = SaturatedMath.add(totalExtracted, outcome.fromNetwork);
+            }
+            if (subNeed > 0 && extracted < need) {
+                ExtractOutcome outcome = extractCredited(node.key, Math.min(subNeed, need - extracted),
+                        inv, synthetic, fundedByCredit, networkSourced, rootNode, src);
+                extracted += outcome.extracted;
+                totalExtracted = SaturatedMath.add(totalExtracted, outcome.fromNetwork);
+                long subRemaining = subNeed - outcome.extracted;
+                Set<IAEItemStack> candidates = candidateIntersection.get(node);
+                if (subRemaining > 0 && candidates != null) {
+                    for (IAEItemStack candidate : candidates) {
+                        if (subRemaining <= 0 || extracted >= need) {
+                            break;
+                        }
+                        ExtractOutcome oc = extractCredited(candidate,
+                                Math.min(subRemaining, need - extracted), inv, synthetic,
+                                fundedByCredit, networkSourced, rootNode, src);
+                        extracted += oc.extracted;
+                        totalExtracted = SaturatedMath.add(totalExtracted, oc.fromNetwork);
+                        subRemaining -= oc.extracted;
+                    }
                 }
             }
             long remaining = need - extracted;
@@ -229,77 +246,26 @@ public final class DagExecutor {
                 case TERMINAL:
                     missingByNode.merge(node, remaining, Long::sum);
                     break;
+                case EMITTER:
+                    // 对齐原生(CraftingTreeNode.request):提取库存后剩余量由发射
+                    // 免费满足——不记缺料、不传播任何原料需求(发射叶无样板分支)
+                    break;
                 case NORMAL: {
                     if (!node.extraBranches.isEmpty()) {
                         // 多样板接管:按原生分支顺序批量分配(非模拟趟容量封顶)
-                        executeMultiBranch(node, remaining, inv, requests, missingByNode, synthetic,
-                                prosByNode.get(node), simulation, src);
+                        executeMultiBranch(node, remaining, inv, requests, subRequests,
+                                candidateIntersection, missingByNode, synthetic,
+                                prosByNode.get(node), containerKeys, simulation, src);
                         break;
                     }
                     long times = SaturatedMath.ceilDiv(remaining, node.outputPerCraft);
                     for (DagGraph.Edge edge : node.edges) {
                         long childRequest = SaturatedMath.multiply(edge.perCraft(), times);
                         requests.merge(edge.child(), childRequest, SaturatedMath::add);
+                        trackSubstituteDemand(edge, childRequest, subRequests, candidateIntersection);
                     }
-                    // 返还物回记:消耗 N 份输入回记返还——自返还(返还物本身是本样板
-                    // 的输入,催化剂型)按 times-1 计(最后一份无法自供,保住种子提取);
-                    // 跨样板复用的返还物按全额 times 计(下游拓扑序后提取);零网络来源
-                    // 的自举返还由扫描后的高水位修正补记 missing=1(对齐原生).
-                    // 可合成样板以配方 getRemainingItems 为准(覆盖 CrT reuse 等
-                    // 不消耗实现);其余回退 Item 容器 API(与旧逻辑一致)
-                    Map<IAEItemStack, Long> remainingTable = RecipeRemainingResolver
-                            .remainingPerCraft(node.pattern);
-                    if (remainingTable != null) {
-                        for (Map.Entry<IAEItemStack, Long> entry : remainingTable.entrySet()) {
-                            long perCraft = entry.getValue();
-                            if (perCraft <= 0) {
-                                continue;
-                            }
-                            boolean selfReturn = containsInput(node.pattern, entry.getKey());
-                            long creditTimes = selfReturn ? times - 1 : times;
-                            if (creditTimes <= 0) {
-                                continue;
-                            }
-                            long credit = SaturatedMath.multiply(perCraft, creditTimes);
-                            IAEItemStack creditStack = entry.getKey().copy();
-                            creditStack.setStackSize(credit);
-                            inv.injectItems(creditStack, Actionable.MODULATE, src);
-                            IAEItemStack containerKey = RecursiveCraftingHelper.canon(creditStack);
-                            synthetic.merge(containerKey, credit, Long::sum);
-                            containerKeys.add(containerKey);
-                        }
-                    } else {
-                        for (IAEItemStack input : node.pattern.getCondensedInputs()) {
-                            if (input == null) {
-                                continue;
-                            }
-                            Item item = input.getItem();
-                            ItemStack def = input.getDefinition();
-                            if (item == null || !item.hasContainerItem(def)) {
-                                continue;
-                            }
-                            ItemStack containerStack = item.getContainerItem(def);
-                            if (containerStack.isEmpty()) {
-                                continue;
-                            }
-                            IAEItemStack containerAe = AEItemStack.fromItemStack(containerStack);
-                            if (containerAe == null) {
-                                continue;
-                            }
-                            boolean selfReturn = containsInput(node.pattern, containerAe);
-                            long creditTimes = selfReturn ? times - 1 : times;
-                            if (creditTimes <= 0) {
-                                continue;
-                            }
-                            containerAe = containerAe.copy();
-                            long credit = SaturatedMath.multiply(input.getStackSize(), creditTimes);
-                            containerAe.setStackSize(credit);
-                            inv.injectItems(containerAe, Actionable.MODULATE, src);
-                            IAEItemStack containerKey = RecursiveCraftingHelper.canon(containerAe);
-                            synthetic.merge(containerKey, credit, Long::sum);
-                            containerKeys.add(containerKey);
-                        }
-                    }
+                    // 返还物回记(自返还 times-1 保种子,跨样板全额)
+                    creditReturns(node.pattern, times, inv, synthetic, containerKeys, src);
                     for (IAEItemStack output : node.pattern.getCondensedOutputs()) {
                         if (output == null) {
                             continue;
@@ -376,8 +342,11 @@ public final class DagExecutor {
      */
     private static void executeMultiBranch(DagGraph.DagNode node, long remaining,
             MECraftingInventory inv, Map<DagGraph.DagNode, Long> requests,
+            Map<DagGraph.DagNode, Long> subRequests,
+            Map<DagGraph.DagNode, Set<IAEItemStack>> candidateIntersection,
             Map<DagGraph.DagNode, Long> missingByNode, Map<IAEItemStack, Long> synthetic,
-            List<CraftingTreeProcess> pros, boolean simulation, IActionSource src) {
+            List<CraftingTreeProcess> pros, Set<IAEItemStack> containerKeys, boolean simulation,
+            IActionSource src) {
         // 本节点本次评估专用 memo:supplyCap 读取的是当前库存,多节点间不复用
         // (库存随执行变化,陈旧 memo 会高估容量、把缺料错误地压在前序分支)
         Map<DagGraph.DagNode, Long> multiMemo = new IdentityHashMap<>();
@@ -407,11 +376,14 @@ public final class DagExecutor {
                 continue;
             }
             for (DagGraph.Edge edge : edges) {
-                requests.merge(edge.child(), SaturatedMath.multiply(edge.perCraft(), times),
-                        SaturatedMath::add);
+                long childRequest = SaturatedMath.multiply(edge.perCraft(), times);
+                requests.merge(edge.child(), childRequest, SaturatedMath::add);
+                trackSubstituteDemand(edge, childRequest, subRequests, candidateIntersection);
             }
-            // 产出注入(含副产物)+ 合成侧余额记账(与单分支路径一致;
-            // 多分支节点经编译保证无容器输入,无需容器回记)
+            // 返还物逐分支回记(1.7.x 解封多样板+容器/返还输入;自返还 times-1
+            // 保种子语义按分支独立计——与原生逐分支逐次循环等价)
+            creditReturns(pattern, times, inv, synthetic, containerKeys, src);
+            // 产出注入(含副产物)+ 合成侧余额记账(与单分支路径一致)
             for (IAEItemStack output : pattern.getCondensedOutputs()) {
                 if (output == null) {
                     continue;
@@ -427,6 +399,125 @@ public final class DagExecutor {
         if (remaining > 0) {
             // 仅非模拟趟可达(模拟趟首分支不封顶必包揽);调用方据此触发模拟趟重算
             missingByNode.merge(node, remaining, Long::sum);
+        }
+    }
+
+    /** 记录可替代边到达的需求(候选按交集合并,任一边无效的候选不予提取). */
+    private static void trackSubstituteDemand(DagGraph.Edge edge, long childRequest,
+            Map<DagGraph.DagNode, Long> subRequests,
+            Map<DagGraph.DagNode, Set<IAEItemStack>> candidateIntersection) {
+        if (edge.substitutes().isEmpty()) {
+            return;
+        }
+        subRequests.merge(edge.child(), childRequest, SaturatedMath::add);
+        candidateIntersection.merge(edge.child(), new LinkedHashSet<>(edge.substitutes()),
+                (existing, incoming) -> {
+                    existing.retainAll(incoming);
+                    return existing;
+                });
+    }
+
+    /**
+     * 提取记账(网络优先):物理实取记 used;实取超过网络真实可用的部分由合成侧
+     * 余额抵扣(credited/funded).编码物与替代候选共用本助手.
+     */
+    private static ExtractOutcome extractCredited(IAEItemStack key, long amount, MECraftingInventory inv,
+            Map<IAEItemStack, Long> synthetic, Map<IAEItemStack, Long> fundedByCredit,
+            Map<IAEItemStack, Long> networkSourced, CraftingTreeNode rootNode, IActionSource src) {
+        long credited = synthetic.getOrDefault(key, 0L);
+        long realAvailable = Math.max(0L, invAmount(inv, key) - credited);
+        long extracted = extract(inv, key, amount, src);
+        long fromNetwork = 0;
+        if (extracted > 0) {
+            fromNetwork = Math.min(extracted, realAvailable);
+            long funded = extracted - fromNetwork;
+            if (funded > 0) {
+                synthetic.merge(key, -funded, Long::sum);
+                fundedByCredit.merge(key, funded, Long::sum);
+            }
+            if (fromNetwork > 0) {
+                networkSourced.merge(key, fromNetwork, Long::sum);
+                IAEItemStack usedStack = key.copy();
+                usedStack.setStackSize(fromNetwork);
+                Ae2CraftingReflect.getNodeUsed(rootNode).add(usedStack);
+            }
+        }
+        return new ExtractOutcome(extracted, fromNetwork);
+    }
+
+    /** 单次提取的结果:总提取量 + 其中来自网络实取的量. */
+    private static final class ExtractOutcome {
+        final long extracted;
+        final long fromNetwork;
+
+        ExtractOutcome(long extracted, long fromNetwork) {
+            this.extracted = extracted;
+            this.fromNetwork = fromNetwork;
+        }
+    }
+
+    /**
+     * 返还物回记:消耗 N 份输入回记返还——自返还(返还物本身是本样板的输入,
+     * 催化剂型)按 times-1 计(最后一份无法自供,保住种子提取);跨样板复用的
+     * 返还物按全额 times 计(下游拓扑序后提取);零网络来源的自举返还由扫描后的
+     * 高水位修正补记 missing=1(对齐原生).
+     * 可合成样板以配方 getRemainingItems 为准(覆盖 CrT reuse 等不消耗实现);
+     * 其余回退 Item 容器 API.单分支与多样板逐分支路径共用.
+     */
+    private static void creditReturns(ICraftingPatternDetails pattern, long times,
+            MECraftingInventory inv, Map<IAEItemStack, Long> synthetic, Set<IAEItemStack> containerKeys,
+            IActionSource src) {
+        Map<IAEItemStack, Long> remainingTable = RecipeRemainingResolver.remainingPerCraft(pattern);
+        if (remainingTable != null) {
+            for (Map.Entry<IAEItemStack, Long> entry : remainingTable.entrySet()) {
+                long perCraft = entry.getValue();
+                if (perCraft <= 0) {
+                    continue;
+                }
+                boolean selfReturn = containsInput(pattern, entry.getKey());
+                long creditTimes = selfReturn ? times - 1 : times;
+                if (creditTimes <= 0) {
+                    continue;
+                }
+                long credit = SaturatedMath.multiply(perCraft, creditTimes);
+                IAEItemStack creditStack = entry.getKey().copy();
+                creditStack.setStackSize(credit);
+                inv.injectItems(creditStack, Actionable.MODULATE, src);
+                IAEItemStack containerKey = RecursiveCraftingHelper.canon(creditStack);
+                synthetic.merge(containerKey, credit, Long::sum);
+                containerKeys.add(containerKey);
+            }
+            return;
+        }
+        for (IAEItemStack input : pattern.getCondensedInputs()) {
+            if (input == null) {
+                continue;
+            }
+            Item item = input.getItem();
+            ItemStack def = input.getDefinition();
+            if (item == null || !item.hasContainerItem(def)) {
+                continue;
+            }
+            ItemStack containerStack = item.getContainerItem(def);
+            if (containerStack.isEmpty()) {
+                continue;
+            }
+            IAEItemStack containerAe = AEItemStack.fromItemStack(containerStack);
+            if (containerAe == null) {
+                continue;
+            }
+            boolean selfReturn = containsInput(pattern, containerAe);
+            long creditTimes = selfReturn ? times - 1 : times;
+            if (creditTimes <= 0) {
+                continue;
+            }
+            containerAe = containerAe.copy();
+            long credit = SaturatedMath.multiply(input.getStackSize(), creditTimes);
+            containerAe.setStackSize(credit);
+            inv.injectItems(containerAe, Actionable.MODULATE, src);
+            IAEItemStack containerKey = RecursiveCraftingHelper.canon(containerAe);
+            synthetic.merge(containerKey, credit, Long::sum);
+            containerKeys.add(containerKey);
         }
     }
 

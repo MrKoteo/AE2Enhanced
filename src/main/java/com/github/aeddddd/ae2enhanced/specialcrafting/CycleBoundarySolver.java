@@ -55,16 +55,27 @@ public final class CycleBoundarySolver {
     public static BoundaryResult solveInto(ICraftingGrid cc, CraftingJob job, IAEItemStack what, long target,
             MECraftingInventory inv, CraftingTreeNode rootNode, IActionSource src, World world,
             AnalysisBudget budget) throws InterruptedException {
-        // ① 净增殖自引用（单节点自环）
+        NetworkPatternIndex index = NetworkPatternIndex.of(cc);
+        List<List<CycleAnalyzer.CycleStep>> cycles = CycleAnalyzer.findCyclesThrough(cc, what, world);
+        // ① 净增殖自引用（单节点自环快速路径）:仅当其非自身输入不触碰任何过 what 的
+        // 环键时安全——否则共输入本身是同环成员,单键贷款法会把它们当普通外部输入经
+        // 原生树请求,而原生 notRecursive 会排除祖先样板,交叉增产环不联动必然部分
+        // 失败误记缺料;此时必须走②并集联立
+        Set<IAEItemStack> cycleKeys = new HashSet<>();
+        for (List<CycleAnalyzer.CycleStep> cycle : cycles) {
+            for (CycleAnalyzer.CycleStep step : cycle) {
+                cycleKeys.add(step.fromKey());
+                cycleKeys.add(step.toKey());
+            }
+        }
         for (ICraftingPatternDetails pattern : cc.getCraftingFor(what, null, -1, world)) {
-            if (RecursiveCraftingHelper.isNetPositiveSelfRef(pattern, what)) {
+            if (RecursiveCraftingHelper.isNetPositiveSelfRef(pattern, what)
+                    && coInputsOutsideCycles(pattern, what, cycleKeys)) {
                 return solveDup(cc, job, pattern, what, target, inv, rootNode, src);
             }
         }
-        NetworkPatternIndex index = NetworkPatternIndex.of(cc);
         // ② 跨样板环:并集优先(θ 形共享结构),再逐环迭代
         boolean overflow = false;
-        List<List<CycleAnalyzer.CycleStep>> cycles = CycleAnalyzer.findCyclesThrough(cc, what, world);
         CycleAnalyzer.Analysis union = budget.expired() ? null
                 : CycleAnalyzer.analyzeUnionMemo(index, cycles);
         if (union != null && union.rateClass() == CycleAnalyzer.RateClass.PRODUCTIVE) {
@@ -121,6 +132,31 @@ public final class CycleBoundarySolver {
         }
         SpecialLog.info("[DAG] 循环边界不可解: {}×{}", what, target);
         return BoundaryResult.FALLBACK;
+    }
+
+    /**
+     * 净增殖自引用样板的非自身输入是否全部不触碰过 what 的环键
+     * （环键集为空时恒 true,保持纯 dup 快速路径不变）.
+     */
+    private static boolean coInputsOutsideCycles(ICraftingPatternDetails pattern, IAEItemStack what,
+            Set<IAEItemStack> cycleKeys) {
+        if (cycleKeys.isEmpty()) {
+            return true;
+        }
+        IAEItemStack self = RecursiveCraftingHelper.canon(what);
+        for (IAEItemStack input : pattern.getCondensedInputs()) {
+            if (input == null || input.getStackSize() <= 0) {
+                continue;
+            }
+            IAEItemStack key = RecursiveCraftingHelper.canon(input);
+            if (key.equals(self)) {
+                continue;
+            }
+            if (cycleKeys.contains(key)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -13,6 +13,7 @@ import appeng.util.inv.IAEAppEngInventory;
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
 import com.github.aeddddd.ae2enhanced.item.ItemChannelReceiverCard;
+import com.github.aeddddd.ae2enhanced.pathing.GridValidationBatcher;
 import com.github.aeddddd.ae2enhanced.tile.TileWirelessChannelTransmitter;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -50,22 +51,31 @@ public class WirelessChannelConnectionHelper {
     /**
      * 验证所有缓存的无线连接,销毁已失效的连接并从缓存中移除.
      * 由定时 tick handler 调用.
+     *
+     * <p>批量销毁期间通过 {@link GridValidationBatcher} 推迟每条连接销毁时的
+     * 双侧 validateGrid 全图 BFS,全部销毁完成后统一做一次分裂检测,
+     * 避免大量连接同时失效(如发射器被破坏后的首次扫描)造成的卡顿尖刺.</p>
      */
     public static void validateAllConnections() {
         if (AE2E_REMOTE_CONNECTIONS.isEmpty()) return;
-        java.util.Iterator<Map.Entry<IGridNode, IGridConnection>> it = AE2E_REMOTE_CONNECTIONS.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<IGridNode, IGridConnection> entry = it.next();
-            IGridConnection conn = entry.getValue();
-            if (!isConnectionValid(conn)) {
-                try {
-                    conn.destroy();
-                } catch (Exception e) {
-                    AE2Enhanced.LOGGER.warn("[AE2E] Failed to destroy invalid wireless connection during validation", e);
+        GridValidationBatcher.begin();
+        try {
+            java.util.Iterator<Map.Entry<IGridNode, IGridConnection>> it = AE2E_REMOTE_CONNECTIONS.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<IGridNode, IGridConnection> entry = it.next();
+                IGridConnection conn = entry.getValue();
+                if (!isConnectionValid(conn)) {
+                    try {
+                        conn.destroy();
+                    } catch (Exception e) {
+                        AE2Enhanced.LOGGER.warn("[AE2E] Failed to destroy invalid wireless connection during validation", e);
+                    }
+                    it.remove();
+                    AE2Enhanced.LOGGER.warn("[AE2E] Removed invalid wireless connection from cache");
                 }
-                it.remove();
-                AE2Enhanced.LOGGER.warn("[AE2E] Removed invalid wireless connection from cache");
             }
+        } finally {
+            GridValidationBatcher.end(null);
         }
     }
 

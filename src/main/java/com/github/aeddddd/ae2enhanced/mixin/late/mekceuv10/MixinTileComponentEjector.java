@@ -1,6 +1,7 @@
 package com.github.aeddddd.ae2enhanced.mixin.late.mekceuv10;
 
 import com.github.aeddddd.ae2enhanced.recycler.MachineOutputRedirector;
+import com.github.aeddddd.ae2enhanced.util.ContainerExtractionGuard;
 import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.fluid.IExtendedFluidTank;
@@ -47,7 +48,8 @@ public abstract class MixinTileComponentEjector {
         }
 
         for (IInventorySlot slot : outputSlots) {
-            if (this.tileEntity.isContainerExtractionGuarded(slot)) {
+            // 反射访问:编译期共享类被旧 Mekanism jar 遮蔽,CE 独有方法无法直接链接
+            if (ContainerExtractionGuard.isGuarded(this.tileEntity, slot)) {
                 continue;
             }
             ItemStack stack = slot.getStack();

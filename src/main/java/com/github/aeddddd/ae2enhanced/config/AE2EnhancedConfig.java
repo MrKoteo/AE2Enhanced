@@ -552,6 +552,30 @@ public class AE2EnhancedConfig {
         })
         @Config.RangeInt(min = 10, max = 60000)
         public int specialDetectorBudgetMs = 1000;
+
+        @Config.Comment({
+            "Time budget (milliseconds) for the VANILLA fallback crafting calculation",
+            "when the DAG/special planners decline a request. Vanilla recursive",
+            "calculation on pathological plans (tens of thousands of nodes times large",
+            "amounts) can grind indefinitely, and mods like RandomComplement block the",
+            "server thread on the calculation future - together this triggers the",
+            "server watchdog. On budget expiry the calculation is aborted and the plan",
+            "is pinned to simulation state (cannot be submitted).",
+            "Set below your server watchdog max-tick-time.",
+            "Range: 1000 ~ 600000, Default: 30000"
+        })
+        @Config.RangeInt(min = 1000, max = 600000)
+        public int nativeCalcBudgetMs = 30000;
+
+        @Config.Comment({
+            "Maximum number of DAG plan graph nodes before the DAG planner declines",
+            "and falls back to vanilla calculation. Large modpack autocrafting orders",
+            "can legitimately exceed 100k distinct items; the planner is linear in",
+            "graph size (~1s per 100k nodes on the calculation thread).",
+            "Range: 10000 ~ 2000000, Default: 300000"
+        })
+        @Config.RangeInt(min = 10000, max = 2000000)
+        public int dagMaxNodes = 300000;
     }
 
     /** DAG 计划引擎模式(kill-switch). */
@@ -700,6 +724,17 @@ public class AE2EnhancedConfig {
             "Default: false"
         })
         public boolean fastPathing = false;
+
+        @Config.Comment({
+            "Skip channel recalculation when the Channels feature is disabled (infinite",
+            "channels). In this situation usedChannels never affects device activity, so",
+            "the vanilla channel assignment BFS, the per-node channel-changed events and",
+            "the booting countdown are pure overhead. Controller state detection and",
+            "controller visuals are unaffected.",
+            "Greatly reduces lag when breaking a device in large networks.",
+            "Default: true"
+        })
+        public boolean skipRecalcWhenChannelsDisabled = true;
     }
 
     public static class SmartPattern {

@@ -1,4 +1,4 @@
-package com.github.aeddddd.ae2enhanced.mixin.late.ae2fc;
+package com.github.aeddddd.ae2enhanced.integration.ae2fc;
 
 import appeng.helpers.DualityInterface;
 import appeng.tile.misc.TileInterface;
@@ -39,7 +39,9 @@ import java.util.Map;
  *   <li>onmi（接口 GUI 改目标方向数）与 fluidPacket（流体封包模式开关）每次重算</li>
  * </ul>
  *
- * <p>本类仅在 ae2fc 存在时经条件 mixin 配置加载，可安全引用 ae2fc 类。
+ * <p>本类仅被 ae2fc 条件 mixin（MixinFluidConvertingInventoryAdaptor）引用，
+ * 不得放入 mixin 包（Mixin 禁止直接引用 mixin 包内的类），
+ * 也不得被无条件加载的类引用（硬引用 ae2fc 类）。
  * 仅限服务端线程访问（wrap 的调用方均在 tick 线程）。</p>
  */
 public final class FluidAdaptorCache {

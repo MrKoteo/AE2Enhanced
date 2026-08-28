@@ -12,6 +12,7 @@ import appeng.crafting.MECraftingInventory;
 import appeng.hooks.TickHandler;
 
 import com.github.aeddddd.ae2enhanced.specialcrafting.Ae2CraftingReflect;
+import com.github.aeddddd.ae2enhanced.specialcrafting.NativeCalcBudget;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialLog;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanDisplayHook;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanMarker;
@@ -40,6 +41,9 @@ public class FallbackDagCraftingJob extends DagCraftingJob {
                     new MECraftingInventory(Ae2CraftingReflect.getOriginal(this), false, false, false));
 
             boolean nativeOk = false;
+            // 原生首趟挂计算预算:病态计划的原生递归可能永不结束(见 NativeCalcBudget);
+            // 超预算中断会钉模拟态并经 InterruptedException 走下方取消分支
+            NativeCalcBudget.arm(this);
             try {
                 MECraftingInventory inv = new MECraftingInventory(Ae2CraftingReflect.getOriginal(this),
                         true, false, true);
@@ -91,12 +95,15 @@ public class FallbackDagCraftingJob extends DagCraftingJob {
             Ae2CraftingReflect.finish(this);
         } catch (InterruptedException e) {
             SpecialLog.info("[DAG] FALLBACK:计算被取消");
+            NativeCalcBudget.warnIfAborted(this);
             Ae2CraftingReflect.finish(this);
         } catch (Throwable t) {
             com.github.aeddddd.ae2enhanced.AE2Enhanced.LOGGER
                     .warn("DAG FALLBACK 异常,回落原生计算: {}", t.toString());
             Ae2CraftingReflect.setAvailableCheck(this, null);
+            NativeCalcBudget.arm(this);
             super.run();
+            NativeCalcBudget.warnIfAborted(this);
         }
     }
 }

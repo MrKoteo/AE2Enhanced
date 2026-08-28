@@ -3,6 +3,7 @@ package com.github.aeddddd.ae2enhanced.test.specialcrafting;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -35,6 +36,10 @@ public class ReusePatternBuilder {
     private final IAEItemStack[] outputs;
     private final List<IAEItemStack> inputs = new ArrayList<>();
     private final Set<IAEItemStack> reusedKeys = new HashSet<>();
+    private boolean canSubstituteFlag;
+    /** 模拟原生 PatternHelper:getSubstituteInputs 恒返回 [编码输入, ...候选](不看 canSubstitute). */
+    private boolean nativeStyleSubstituteList;
+    private final Map<IAEItemStack, List<IAEItemStack>> substituteAlts = new java.util.LinkedHashMap<>();
 
     public ReusePatternBuilder(IAEItemStack... outputs) {
         this.outputs = outputs.clone();
@@ -55,6 +60,29 @@ public class ReusePatternBuilder {
         return this;
     }
 
+    /** 设置 canSubstitute 标志（独立于替代列表,与原生 PatternHelper 一致）. */
+    public ReusePatternBuilder canSubstitute(boolean flag) {
+        this.canSubstituteFlag = flag;
+        return this;
+    }
+
+    /**
+     * 模拟原生语义:getSubstituteInputs 对占用槽恒返回 [编码输入, ...注册候选],
+     * 不看 canSubstitute 标志（生产 PatternHelper 的真实行为,1.12.2 口径回归用）.
+     */
+    public ReusePatternBuilder nativeStyleSubstituteList() {
+        this.nativeStyleSubstituteList = true;
+        return this;
+    }
+
+    /** 注册某输入的额外替代候选（矿词等价物等）. */
+    public ReusePatternBuilder substituteAlternatives(IAEItemStack input, IAEItemStack... alts) {
+        this.substituteAlts
+                .computeIfAbsent(RecursiveCraftingHelper.canon(input), k -> new ArrayList<>())
+                .addAll(java.util.Arrays.asList(alts));
+        return this;
+    }
+
     public ICraftingPatternDetails build() {
         final IAEItemStack[] condensedInputs = ProcessingPatternBuilder.condense(this.inputs);
         final IAEItemStack[] condensedOutputs = ProcessingPatternBuilder.condense(
@@ -68,7 +96,8 @@ public class ReusePatternBuilder {
         }
         final Set<IAEItemStack> reused = new HashSet<>(this.reusedKeys);
         final IRecipe recipe = new TestRecipe(reused);
-        return new TestReusePattern(condensedInputs, condensedOutputs, template, recipe);
+        return new TestReusePattern(condensedInputs, condensedOutputs, template, recipe,
+                this.canSubstituteFlag, this.nativeStyleSubstituteList, this.substituteAlts);
     }
 
     /**
@@ -128,13 +157,20 @@ public class ReusePatternBuilder {
         private final IAEItemStack[] condensedOutputs;
         private final InventoryCrafting template;
         private final IRecipe recipe;
+        private final boolean canSubstitute;
+        private final boolean nativeStyleSubstituteList;
+        private final Map<IAEItemStack, List<IAEItemStack>> substituteAlts;
 
         TestReusePattern(IAEItemStack[] condensedInputs, IAEItemStack[] condensedOutputs,
-                InventoryCrafting template, IRecipe recipe) {
+                InventoryCrafting template, IRecipe recipe, boolean canSubstitute,
+                boolean nativeStyleSubstituteList, Map<IAEItemStack, List<IAEItemStack>> substituteAlts) {
             this.condensedInputs = condensedInputs;
             this.condensedOutputs = condensedOutputs;
             this.template = template;
             this.recipe = recipe;
+            this.canSubstitute = canSubstitute;
+            this.nativeStyleSubstituteList = nativeStyleSubstituteList;
+            this.substituteAlts = substituteAlts;
         }
 
         @Override
@@ -174,7 +210,30 @@ public class ReusePatternBuilder {
 
         @Override
         public boolean canSubstitute() {
-            return false;
+            return this.canSubstitute;
+        }
+
+        /**
+         * 模拟原生 PatternHelper 口径（nativeStyleSubstituteList 开启时）:
+         * 占用槽恒返回 [编码输入, ...注册候选],不看 canSubstitute 标志.
+         * slot 简化映射为 getInputs() 下标（mock 内自洽）.
+         */
+        @Override
+        public List<IAEItemStack> getSubstituteInputs(int slot) {
+            if (!this.nativeStyleSubstituteList) {
+                return java.util.Collections.emptyList();
+            }
+            IAEItemStack[] inputs = this.getInputs();
+            if (slot < 0 || slot >= inputs.length || inputs[slot] == null) {
+                return java.util.Collections.emptyList();
+            }
+            List<IAEItemStack> list = new ArrayList<>();
+            list.add(inputs[slot]);
+            List<IAEItemStack> alts = this.substituteAlts.get(RecursiveCraftingHelper.canon(inputs[slot]));
+            if (alts != null) {
+                list.addAll(alts);
+            }
+            return list;
         }
 
         @Override

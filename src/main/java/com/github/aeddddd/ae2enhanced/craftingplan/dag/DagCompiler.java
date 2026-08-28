@@ -3,6 +3,7 @@ package com.github.aeddddd.ae2enhanced.craftingplan.dag;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +16,7 @@ import appeng.api.networking.crafting.ICraftingGrid;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.storage.data.IAEItemStack;
 
+import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
 import com.github.aeddddd.ae2enhanced.specialcrafting.CycleAnalyzer;
 import com.github.aeddddd.ae2enhanced.specialcrafting.RecipeRemainingResolver;
 import com.github.aeddddd.ae2enhanced.specialcrafting.RecursiveCraftingHelper;
@@ -25,17 +27,24 @@ import com.github.aeddddd.ae2enhanced.specialcrafting.RecursiveCraftingHelper;
  * <li>节点按 key 合并——重复子树只编译一次(相对原生递归树的核心提速点);</li>
  * <li>两遍编译:第一遍 DFS 探环(回边目标记入边界集合),第二遍把边界 key
  * 当 CYCLE 叶子正式编译;出现边界外的新环 → 回落;</li>
- * <li>只接管"干净"样板:每个输入槽无替代候选({@code getSubstituteInputs} 为空);
- * 存在任一不干净输入 → 换下一个候选样板,全部不干净 → 整单回落;</li>
- * <li>选定样板本身是环步骤(含经副产物闭合的催化环)→ 节点收缩为循环边界,
- * 由 CycleBoundarySolver 联立求解;</li>
+ * <li>替代感知:启用替代标志的样板照常接管——边携带逐槽替代候选(矿词等),
+ * 执行器需求拆分提取(编码优先→候选交集),与原生"替代仅作用于库存提取、
+ * 合成仍走编码物"语义一致;</li>
+ * <li>分层选样板:同优先级层内优先非环样板(少环配方,抑制嵌套环计划膨胀);
+ * 最高优先级层全部成环才收缩为循环边界,由 CycleBoundarySolver 联立求解;</li>
  * <li>预算:节点数上限,超限即回落(防病态网络卡死计算线程).</li>
  * </ul>
  */
 public final class DagCompiler {
 
-    /** 单图节点数上限(病态深度/广度保护). */
+    /** 单图节点数上限(病态深度/广度保护;生产大单可到 14w+,经配置放宽). */
     public static final int MAX_NODES = 100_000;
+
+    /** 实际生效的节点上限(配置优先,保底 MAX_NODES 常量值). */
+    private static int maxNodes() {
+        return AE2EnhancedConfig.crafting == null ? MAX_NODES
+                : Math.max(1, AE2EnhancedConfig.crafting.dagMaxNodes);
+    }
 
     private static final int WHITE = 0;
     private static final int GRAY = 1;
@@ -105,7 +114,7 @@ public final class DagCompiler {
             }
             return existing; // BLACK:已编译,直接共享
         }
-        if (this.nodes.size() >= MAX_NODES) {
+        if (this.nodes.size() >= maxNodes()) {
             throw new DagFallback("budget_nodes_exceeded");
         }
         if (!this.detectOnly && this.boundaryKeys.contains(key)) {
@@ -132,61 +141,91 @@ public final class DagCompiler {
         return node;
     }
 
-    /** 展开一个分支的输入边(condensed 输入序 = 原生逐槽位处理序). */
+    /** 展开一个分支的输入边(condensed 输入序 = 原生逐槽位处理序;携带替代候选). */
     private void visitInputs(ICraftingPatternDetails pattern, List<DagGraph.Edge> edges) throws DagFallback {
         for (IAEItemStack input : pattern.getCondensedInputs()) {
             if (input == null || input.getStackSize() <= 0) {
                 continue;
             }
             long perCraft = input.getStackSize();
-            edges.add(new DagGraph.Edge(this.visit(RecursiveCraftingHelper.canon(input)), perCraft));
+            edges.add(new DagGraph.Edge(this.visit(RecursiveCraftingHelper.canon(input)), perCraft,
+                    substituteCandidates(pattern, input)));
         }
     }
 
-    private DagGraph.DagNode buildNode(IAEItemStack key) throws DagFallback {
-        List<ICraftingPatternDetails> clean = new ArrayList<>();
-        boolean sawAny = false;
-        for (ICraftingPatternDetails pattern : this.cc.getCraftingFor(key, null, -1, this.world)) {
-            sawAny = true;
-            if (isClean(pattern)) {
-                clean.add(pattern);
+    /**
+     * 收集某 condensed 输入的替代候选(canon 键,不含编码输入自身;空 = 精确输入).
+     * 仅可合成且启用替代标志的样板有候选;processing 样板不可调
+     * getSubstituteInputs(standardRecipe == null 必 NPE),直接短路为空.
+     * 同一物品多槽位时取各槽候选并集(同物品候选通常来自同一矿词条目).
+     */
+    private static List<IAEItemStack> substituteCandidates(ICraftingPatternDetails pattern,
+            IAEItemStack encoded) {
+        if (!pattern.isCraftable() || !pattern.canSubstitute()) {
+            return java.util.Collections.emptyList();
+        }
+        Set<IAEItemStack> candidates = new LinkedHashSet<>();
+        IAEItemStack[] inputs = pattern.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            IAEItemStack slotInput = inputs[slot];
+            if (slotInput == null || !slotInput.isSameType(encoded)) {
+                continue;
             }
+            for (IAEItemStack substitute : pattern.getSubstituteInputs(slot)) {
+                if (substitute != null && !slotInput.isSameType(substitute)) {
+                    candidates.add(RecursiveCraftingHelper.canon(substitute));
+                }
+            }
+        }
+        return candidates.isEmpty() ? java.util.Collections.emptyList()
+                : new ArrayList<>(candidates);
+    }
+
+    private DagGraph.DagNode buildNode(IAEItemStack key) throws DagFallback {
+        // 对齐原生语义(CraftingTreeNode.addNode):可发射物品不展开任何样板分支——
+        // 提取库存后剩余量由发射免费满足,即使有可用样板也不走合成
+        if (this.cc.canEmitFor(key)) {
+            return new DagGraph.DagNode(DagGraph.Kind.EMITTER, key, 0, null);
+        }
+        List<ICraftingPatternDetails> clean = new ArrayList<>();
+        for (ICraftingPatternDetails pattern : this.cc.getCraftingFor(key, null, -1, this.world)) {
+            // 替代候选不再是限制:边携带候选,执行器需求拆分提取(编码优先→候选交集),
+            // 与原生"替代仅作用于库存提取、合成仍走编码物"语义一致
+            clean.add(pattern);
         }
         if (clean.isEmpty()) {
-            if (sawAny) {
-                // 有样板但全部含替代输入:本版本不接管
-                throw new DagFallback("unclean_inputs:" + key);
-            }
-            if (this.cc.canEmitFor(key)) {
-                return new DagGraph.DagNode(DagGraph.Kind.EMITTER, key, 0, null);
-            }
             return new DagGraph.DagNode(DagGraph.Kind.TERMINAL, key, 0, null);
         }
-        ICraftingPatternDetails chosen = clean.get(0);
-        // 选定样板本身是环步骤(含经副产物闭合的催化环)→ 本节点收缩为循环边界,
-        // 由 CycleBoundarySolver 联立求解(否则边界会错位落到环键上而不可解)
-        if (CycleAnalyzer.isCycleStep(this.cc, this.world, chosen, this.producerIndex)) {
+        // 分层选样板:同优先级层内优先<b>非环</b>样板——嵌套环配方的计划会大幅
+        // 膨胀(边界子树乘性展开),有可用的非环配方即避开循环边界;
+        // 显式优先级层不被跨越:最高优先级层全部成环时才收缩为循环边界
+        // (用户可通过提高环配方优先级强制走环).成环样板不再参与常规分支
+        // (原 cycle_multi 整单回落随之消除).
+        int topPriority = Integer.MIN_VALUE;
+        for (ICraftingPatternDetails pattern : clean) {
+            topPriority = Math.max(topPriority, pattern.getPriority());
+        }
+        DagGraph.DagNode node = null;
+        for (ICraftingPatternDetails pattern : clean) {
+            if (CycleAnalyzer.isCycleStep(this.cc, this.world, pattern, this.producerIndex)) {
+                continue;
+            }
+            if (node == null) {
+                if (pattern.getPriority() < topPriority) {
+                    continue; // 顶层无非环:低层非环不启用(尊重显式优先级)
+                }
+                node = new DagGraph.DagNode(DagGraph.Kind.NORMAL, key, outPerOf(pattern, key),
+                        pattern);
+            } else {
+                node.extraBranches.add(new DagGraph.Branch(pattern, outPerOf(pattern, key)));
+            }
+        }
+        if (node == null) {
+            // 最高优先级层全部成环 → 本节点收缩为循环边界,由 CycleBoundarySolver 联立求解
             return new DagGraph.DagNode(DagGraph.Kind.CYCLE, key, 0, null);
         }
-        DagGraph.DagNode node = new DagGraph.DagNode(DagGraph.Kind.NORMAL, key, outPerOf(chosen, key),
-                chosen);
-        if (clean.size() > 1) {
-            // 多样板接管(修复"多样板 key × 极大数量"的 O(数量) 下单陷阱,移植自 1.20.1):
-            // 任一分支含容器输入或为环步骤 → 语义过繁,整单回落原生(保守)
+        if (!node.extraBranches.isEmpty()) {
             this.sawMultiBranch = true;
-            if (hasContainerInput(chosen)) {
-                throw new DagFallback("container_multi:" + key);
-            }
-            for (int i = 1; i < clean.size(); i++) {
-                ICraftingPatternDetails branch = clean.get(i);
-                if (hasContainerInput(branch)) {
-                    throw new DagFallback("container_multi:" + key);
-                }
-                if (CycleAnalyzer.isCycleStep(this.cc, this.world, branch, this.producerIndex)) {
-                    throw new DagFallback("cycle_multi:" + key);
-                }
-                node.extraBranches.add(new DagGraph.Branch(branch, outPerOf(branch, key)));
-            }
         }
         return node;
     }
@@ -203,52 +242,6 @@ public final class DagCompiler {
             throw new DagFallback("pattern_without_output:" + key);
         }
         return outPer;
-    }
-
-    /**
-     * 任一输入带返还(多分支节点的返还语义不予接管).
-     * 可合成样板以配方 getRemainingItems 判定(覆盖 CrT reuse 等不消耗实现);
-     * 其余回退 Item 容器 API.
-     */
-    private static boolean hasContainerInput(ICraftingPatternDetails pattern) {
-        Map<IAEItemStack, Long> remaining = RecipeRemainingResolver.remainingPerCraft(pattern);
-        if (remaining != null) {
-            return !remaining.isEmpty();
-        }
-        for (IAEItemStack input : pattern.getCondensedInputs()) {
-            if (input == null || input.getItem() == null) {
-                continue;
-            }
-            if (input.getItem().hasContainerItem(input.getDefinition())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 干净样板:每个输入槽无替代候选.
-     * <p>容器物返还不再是限制(1.1.0):原生对容器样板逐次(times=1)循环,
-     * 但"消耗输入→回记容器"在批量记账下完全等价(消耗 N 份、回记 N-1 份容器,
-     * 首个循环不预贷),执行器统一回记,见 DagExecutor.</p>
-     */
-    private static boolean isClean(ICraftingPatternDetails pattern) {
-        // processing 样板无替代输入概念,且原生 PatternHelper.getSubstituteInputs
-        // 在 standardRecipe == null 时必 NPE(直接读取其配料表)——必须短路,
-        // 否则任何含 processing 样板的请求都会异常回落原生并刷警告日志
-        if (!pattern.isCraftable()) {
-            return true;
-        }
-        IAEItemStack[] inputs = pattern.getInputs();
-        for (int slot = 0; slot < inputs.length; slot++) {
-            if (inputs[slot] == null) {
-                continue;
-            }
-            if (!pattern.getSubstituteInputs(slot).isEmpty()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Nullable

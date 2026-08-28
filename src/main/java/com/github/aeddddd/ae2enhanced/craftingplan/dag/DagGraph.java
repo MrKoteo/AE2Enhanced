@@ -30,18 +30,33 @@ public final class DagGraph {
     public static final class Edge {
         private final DagNode child;
         private final long perCraft;
+        /**
+         * 该输入槽的替代候选(矿词等价物等,canon 键,不含编码输入自身;空 = 精确输入).
+         * 仅父样板可合成且启用替代标志时非空;执行层 canCraft 对启用替代的样板
+         * 逐槽接受候选(已实证),故含候选的计划在执行层有效.
+         */
+        private final List<IAEItemStack> substitutes;
 
         public Edge(DagNode child, long perCraft) {
+            this(child, perCraft, java.util.Collections.emptyList());
+        }
+
+        public Edge(DagNode child, long perCraft, List<IAEItemStack> substitutes) {
             this.child = child;
             this.perCraft = perCraft;
+            this.substitutes = substitutes;
         }
 
         public DagNode child() {
-            return child;
+            return this.child;
         }
 
         public long perCraft() {
-            return perCraft;
+            return this.perCraft;
+        }
+
+        public List<IAEItemStack> substitutes() {
+            return this.substitutes;
         }
     }
 
@@ -72,7 +87,7 @@ public final class DagGraph {
         /**
          * 额外候选分支(多样板接管,仅 NORMAL):pattern/edges/outputPerCraft
          * 为主分支(分支 0),本列表为分支 1..N;为空 = 单一样板节点.
-         * 编译规则:任一分支含容器输入或为环步骤 → 整单回落(不生成多分支节点).
+         * 编译规则:成环样板不参与常规分支(全部成环才收缩为循环边界).
          */
         public final List<Branch> extraBranches = new ArrayList<>();
 

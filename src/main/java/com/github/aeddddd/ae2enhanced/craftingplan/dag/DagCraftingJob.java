@@ -21,6 +21,7 @@ import appeng.hooks.TickHandler;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.specialcrafting.Ae2CraftingReflect;
+import com.github.aeddddd.ae2enhanced.specialcrafting.NativeCalcBudget;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialLog;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanDisplayHook;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanMarker;
@@ -34,12 +35,37 @@ import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanMarker;
  * 全部复用原生路径.含循环边界的计划标记特殊,硬路由到超因果计算核心
  * （无限库存 + 门控/配额调度在场）.</p>
  */
-public class DagCraftingJob extends CraftingJob {
+public class DagCraftingJob extends CraftingJob
+        implements com.github.aeddddd.ae2enhanced.mixin.bridge.ICraftingJobBudgetAccess {
 
     protected final World world;
 
     /** 本次计划是否含循环边界（物化成功后用于特殊标记）. */
     protected boolean hasCycleBoundary;
+
+    /** 原生回落计算预算状态（MixinCraftingJob 的 handlePausing 心跳读取）. */
+    private long nativeCalcDeadlineNanos;
+    private boolean nativeCalcAborted;
+
+    @Override
+    public long ae2enhanced$nativeCalcDeadlineNanos() {
+        return this.nativeCalcDeadlineNanos;
+    }
+
+    @Override
+    public void ae2enhanced$armNativeCalcBudget(long deadlineNanos) {
+        this.nativeCalcDeadlineNanos = deadlineNanos;
+    }
+
+    @Override
+    public void ae2enhanced$markNativeCalcAborted() {
+        this.nativeCalcAborted = true;
+    }
+
+    @Override
+    public boolean ae2enhanced$nativeCalcAborted() {
+        return this.nativeCalcAborted;
+    }
 
     public DagCraftingJob(World w, IGrid grid, IActionSource actionSrc, IAEItemStack what,
             ICraftingCallback callback) {
@@ -56,7 +82,11 @@ public class DagCraftingJob extends CraftingJob {
             CraftingTreeNode root = this.computeDagPlan();
             if (root == null) {
                 Ae2CraftingReflect.setAvailableCheck(this, null);
+                // 回落原生:挂计算预算——病态计划的原生递归可能永不结束,
+                // 而下单流程(如 RandomComplement 的 setJob 混入)会同步阻塞服务器线程
+                NativeCalcBudget.arm(this);
                 super.run();
+                NativeCalcBudget.warnIfAborted(this);
                 return;
             }
             Ae2CraftingReflect.setTree(this, root);
@@ -69,11 +99,14 @@ public class DagCraftingJob extends CraftingJob {
             Ae2CraftingReflect.finish(this);
         } catch (InterruptedException e) {
             SpecialLog.info("[DAG] 计算被取消");
+            NativeCalcBudget.warnIfAborted(this);
             Ae2CraftingReflect.finish(this);
         } catch (Throwable t) {
             AE2Enhanced.LOGGER.warn("DAG 计划异常,回落原生计算: {}", t.toString());
             Ae2CraftingReflect.setAvailableCheck(this, null);
+            NativeCalcBudget.arm(this);
             super.run();
+            NativeCalcBudget.warnIfAborted(this);
         }
     }
 

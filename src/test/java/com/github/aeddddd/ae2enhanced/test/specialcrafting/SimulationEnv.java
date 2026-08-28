@@ -85,11 +85,17 @@ public class SimulationEnv {
     public ICraftingPatternDetails addPattern(ICraftingPatternDetails pattern) {
         this.patterns.computeIfAbsent(RecursiveCraftingHelper.canon(pattern.getPrimaryOutput()),
                 k -> new ArrayList<>()).add(pattern);
+        ((AnonymousCraftingGrid) this.craftingGrid).invalidateIndex();
         return pattern;
     }
 
     public void addStoredItem(IAEItemStack stack) {
         this.networkStorage.add(stack.copy());
+    }
+
+    /** 测试用库存清单访问(规模诊断基准需要直接迭代快照成本). */
+    public IItemList<IAEItemStack> networkStorage() {
+        return this.networkStorage;
     }
 
     /** 标记某物可由发射台提供(level emitter). */
@@ -195,6 +201,12 @@ public class SimulationEnv {
     private class AnonymousCraftingGrid implements ICraftingGrid,
             com.github.aeddddd.ae2enhanced.mixin.bridge.ICraftingGridCacheAccess {
 
+        private volatile com.github.aeddddd.ae2enhanced.specialcrafting.NetworkPatternIndex cachedIndex;
+
+        void invalidateIndex() {
+            this.cachedIndex = null;
+        }
+
         @Override
         public java.util.Set<IAEItemStack> ae2enhanced$craftableKeys() {
             return new java.util.HashSet<>(patterns.keySet());
@@ -202,8 +214,20 @@ public class SimulationEnv {
 
         @Override
         public com.github.aeddddd.ae2enhanced.specialcrafting.NetworkPatternIndex ae2enhanced$patternIndex() {
-            // 测试环境样板集可随时增删,每次重建(规模小,不计成本)
-            return com.github.aeddddd.ae2enhanced.specialcrafting.NetworkPatternIndex.build(this);
+            // 与生产 MixinCraftingGridCache 一致:缓存构建,样板集变更(addPattern)时失效.
+            // (此前每次调用全量重建——大图 × 多循环边界场景下制造 GB 级垃圾并 OOM,
+            // 掩盖了生产环境(缓存)的真实成本)
+            com.github.aeddddd.ae2enhanced.specialcrafting.NetworkPatternIndex idx = this.cachedIndex;
+            if (idx == null) {
+                synchronized (this) {
+                    idx = this.cachedIndex;
+                    if (idx == null) {
+                        idx = com.github.aeddddd.ae2enhanced.specialcrafting.NetworkPatternIndex.build(this);
+                        this.cachedIndex = idx;
+                    }
+                }
+            }
+            return idx;
         }
 
         @Override
@@ -223,7 +247,13 @@ public class SimulationEnv {
         public ImmutableCollection<ICraftingPatternDetails> getCraftingFor(IAEItemStack whatToCraft,
                 ICraftingPatternDetails details, int slotIndex, World world) {
             List<ICraftingPatternDetails> list = patterns.get(RecursiveCraftingHelper.canon(whatToCraft));
-            return list == null ? ImmutableList.of() : ImmutableList.copyOf(list);
+            if (list == null) {
+                return ImmutableList.of();
+            }
+            // 对齐原生:按优先级降序(稳定排序,同优先级保持插入序 = 网络扫描序)
+            List<ICraftingPatternDetails> sorted = new ArrayList<>(list);
+            sorted.sort((a, b) -> b.getPriority() - a.getPriority());
+            return ImmutableList.copyOf(sorted);
         }
 
             @Override

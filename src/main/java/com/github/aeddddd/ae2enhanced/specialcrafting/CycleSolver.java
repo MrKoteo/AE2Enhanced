@@ -267,23 +267,49 @@ public final class CycleSolver {
      * 产出请求键的样板;催化环 = 产出交付副产物的样板,如 1A→1X+1B 中的该样板）,
      * 其余样板挂到消费其 toKey 的样板的对应输入子节点下;最末端输入节点保持为叶子
      * （种子喂养）.</p>
+     * <p>挂接采用 <b>BFS 生成树</b>:从根锚点样板出发,沿"消费者的输入子节点"
+     * 反向扩散,保证每个 process 从根可达且不成环。直接"找首个消费者子节点"
+     * 会在致密交叉环中形成不含根锚点的挂接环（如 P1→P4→P1),整段子树从根
+     * 不可达,dive 丢失这些样板的调用计数;自引用样板（1A+1B→2A）还会匹配到
+     * 自身的输入子节点而自挂。</p>
      */
     private static void reattachProcesses(CraftingTreeNode rootNode, IAEItemStack rootWhat,
             List<CycleAnalyzer.CycleStep> proSteps, List<CraftingTreeProcess> pros) {
         Ae2CraftingReflect.getNodeProcesses(rootNode).clear();
-        for (int i = 0; i < pros.size(); i++) {
-            CycleAnalyzer.CycleStep step = proSteps.get(i);
-            CraftingTreeNode parentNode;
-            if (producesKey(step.pattern(), rootWhat)) {
-                parentNode = rootNode;
-            } else {
-                parentNode = findConsumerChildNode(step, proSteps, pros);
-                if (parentNode == null) {
-                    throw new IllegalStateException("循环链层级重建失败:找不到消费 " + step.toKey() + " 的样板子节点");
+        int n = pros.size();
+        boolean[] visited = new boolean[n];
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        // 根锚点:产出 rootWhat 的样板直接挂根下
+        for (int i = 0; i < n; i++) {
+            if (producesKey(proSteps.get(i).pattern(), rootWhat)) {
+                Ae2CraftingReflect.setProcessParent(pros.get(i), rootNode);
+                Ae2CraftingReflect.addProcessToNode(rootNode, pros.get(i));
+                visited[i] = true;
+                queue.add(i);
+            }
+        }
+        // BFS:已挂接样板的每个输入子节点(what=key)接纳"产出 key 且未挂接"的样板.
+        // 自引用步骤已在队列中标记 visited,不会挂到自己的输入子节点下
+        while (!queue.isEmpty()) {
+            int parent = queue.poll();
+            for (CraftingTreeNode child : Ae2CraftingReflect.getProcessNodes(pros.get(parent)).keySet()) {
+                IAEItemStack childWhat = Ae2CraftingReflect.getNodeWhat(child);
+                for (int j = 0; j < n; j++) {
+                    if (visited[j] || !proSteps.get(j).toKey().equals(childWhat)) {
+                        continue;
+                    }
+                    Ae2CraftingReflect.setProcessParent(pros.get(j), child);
+                    Ae2CraftingReflect.addProcessToNode(child, pros.get(j));
+                    visited[j] = true;
+                    queue.add(j);
                 }
             }
-            Ae2CraftingReflect.setProcessParent(pros.get(i), parentNode);
-            Ae2CraftingReflect.addProcessToNode(parentNode, pros.get(i));
+        }
+        for (int i = 0; i < n; i++) {
+            if (!visited[i]) {
+                throw new IllegalStateException(
+                        "循环链层级重建失败:找不到消费 " + proSteps.get(i).toKey() + " 的样板子节点");
+            }
         }
     }
 
@@ -295,23 +321,5 @@ public final class CycleSolver {
             }
         }
         return false;
-    }
-
-    /**
-     * 在所有样板的输入子节点中找到 what 等于 {@code step.toKey} 的节点
-     * （即该键的实际消费者）.注意:不能按 step.fromKey 匹配——并集分析按
-     * 样板去重后,多消费样板（如 θ 的回转样板）只保留一条 fromKey 记录,
-     * 其另一路消费关系会丢失;直接按子节点查找则总是正确.
-     */
-    private static CraftingTreeNode findConsumerChildNode(CycleAnalyzer.CycleStep step,
-            List<CycleAnalyzer.CycleStep> proSteps, List<CraftingTreeProcess> pros) {
-        for (CraftingTreeProcess pro : pros) {
-            for (CraftingTreeNode child : Ae2CraftingReflect.getProcessNodes(pro).keySet()) {
-                if (step.toKey().equals(Ae2CraftingReflect.getNodeWhat(child))) {
-                    return child;
-                }
-            }
-        }
-        return null;
     }
 }
