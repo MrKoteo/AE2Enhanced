@@ -21,6 +21,8 @@ import java.util.List;
  */
 public final class PersonalDimCheck implements SystemCheck {
 
+    private static final String KEY_PREFIX = "chat.ae2enhanced.check.personaldim.";
+
     @Override
     public String name() {
         return "personaldim";
@@ -28,7 +30,7 @@ public final class PersonalDimCheck implements SystemCheck {
 
     @Override
     public String displayName() {
-        return "个人维度";
+        return KEY_PREFIX + "name";
     }
 
     @Override
@@ -36,7 +38,7 @@ public final class PersonalDimCheck implements SystemCheck {
         try {
             WorldServer overworld = server.getWorld(0);
             if (overworld == null) {
-                out.add(CheckResult.warn("主世界不可用,跳过个人维度检查"));
+                out.add(CheckResult.warn(KEY_PREFIX + "overworld_unavailable"));
                 return;
             }
             PersonalDimensionData data = PersonalDimensionData.get(overworld);
@@ -55,21 +57,18 @@ public final class PersonalDimCheck implements SystemCheck {
                 assigned++;
                 if (!DimensionManager.isDimensionRegistered(dimId)) {
                     orphan++;
-                    out.add(CheckResult.error("玩家 " + entry.playerId + " 的维度 " + dimId
-                            + " 未注册(孤儿条目)"));
+                    out.add(CheckResult.error(KEY_PREFIX + "orphan", String.valueOf(entry.playerId), dimId));
                 } else if (!PersonalDimensionManager.isPersonalDimension(dimId)) {
                     typeConflict++;
-                    out.add(CheckResult.error("玩家 " + entry.playerId + " 的维度 " + dimId
-                            + " 已被其他维度类型占用(ID 冲突)"));
+                    out.add(CheckResult.error(KEY_PREFIX + "conflict", String.valueOf(entry.playerId), dimId));
                 }
             }
-            out.add(CheckResult.ok("条目: " + entries.size() + " 个(已分配维度 " + assigned
-                    + " 个,未分配 " + unassigned + " 个)"));
+            out.add(CheckResult.ok(KEY_PREFIX + "entries_summary", entries.size(), assigned, unassigned));
             if (orphan == 0 && typeConflict == 0 && assigned > 0) {
-                out.add(CheckResult.ok("维度注册状态全部一致"));
+                out.add(CheckResult.ok(KEY_PREFIX + "all_consistent"));
             }
         } catch (Exception e) {
-            out.add(CheckResult.error("个人维度检查执行异常: " + e));
+            out.add(CheckResult.error(KEY_PREFIX + "exception", String.valueOf(e)));
         }
     }
 }

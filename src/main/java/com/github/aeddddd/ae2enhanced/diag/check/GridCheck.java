@@ -24,6 +24,8 @@ import java.util.List;
  */
 public final class GridCheck implements SystemCheck {
 
+    private static final String KEY_PREFIX = "chat.ae2enhanced.check.grid.";
+
     @Override
     public String name() {
         return "grid";
@@ -31,7 +33,7 @@ public final class GridCheck implements SystemCheck {
 
     @Override
     public String displayName() {
-        return "AE2 网格";
+        return KEY_PREFIX + "name";
     }
 
     @Override
@@ -74,20 +76,20 @@ public final class GridCheck implements SystemCheck {
                 }
             }
 
-            out.add(CheckResult.ok("网格: " + grids + " 个,节点: " + nodes + " 个,平均功耗: "
-                    + String.format(java.util.Locale.ROOT, "%.1f", totalPowerUsage) + " AE/t"));
-            out.add(CheckResult.ok("合成 CPU: " + cpusTotal + " 个(忙碌 " + cpusBusy + " 个)"));
+            out.add(CheckResult.ok(KEY_PREFIX + "summary", grids, nodes,
+                    String.format(java.util.Locale.ROOT, "%.1f", totalPowerUsage)));
+            out.add(CheckResult.ok(KEY_PREFIX + "cpus", cpusTotal, cpusBusy));
             if (emptyGrids > 0) {
-                out.add(CheckResult.warn("空网格: " + emptyGrids + " 个"));
+                out.add(CheckResult.warn(KEY_PREFIX + "empty_grids", emptyGrids));
             }
             if (conflicted > 0) {
-                out.add(CheckResult.error("控制器冲突网格: " + conflicted + " 个"));
+                out.add(CheckResult.error(KEY_PREFIX + "controller_conflicts", conflicted));
             }
             if (unpowered > 0) {
-                out.add(CheckResult.warn("疑似断电网格(有功耗但储能为零): " + unpowered + " 个"));
+                out.add(CheckResult.warn(KEY_PREFIX + "unpowered", unpowered));
             }
         } catch (Exception e) {
-            out.add(CheckResult.error("网格检查执行异常: " + e));
+            out.add(CheckResult.error(KEY_PREFIX + "exception", String.valueOf(e)));
         }
     }
 }

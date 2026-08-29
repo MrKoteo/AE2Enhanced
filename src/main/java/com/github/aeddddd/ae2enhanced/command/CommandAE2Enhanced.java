@@ -49,7 +49,9 @@ import net.minecraft.item.ItemTool;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.world.WorldServer;
@@ -329,7 +331,7 @@ public class CommandAE2Enhanced extends CommandBase {
         if (sender.canUseCommand(2, getName())) {
             return true;
         }
-        sender.sendMessage(new TextComponentString(TextFormatting.RED + "[AE2E] You do not have permission to use this subcommand."));
+        sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.command.no_permission"));
         return false;
     }
 
@@ -345,7 +347,7 @@ public class CommandAE2Enhanced extends CommandBase {
         if (canUseAnalysis(sender)) {
             return true;
         }
-        sender.sendMessage(new TextComponentString(TextFormatting.RED + "[AE2E] You do not have permission to use this subcommand."));
+        sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.command.no_permission"));
         return false;
     }
 
@@ -518,24 +520,23 @@ public class CommandAE2Enhanced extends CommandBase {
                 totalWarn += DiagChecks.countLevel(results, CheckResult.Level.WARN);
                 totalError += DiagChecks.countLevel(results, CheckResult.Level.ERROR);
             }
-            sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Diag] 全部系统检查完成: "
-                    + TextFormatting.YELLOW + "WARN=" + totalWarn + " "
-                    + TextFormatting.RED + "ERROR=" + totalError));
+            sender.sendMessage(msg(totalError > 0 ? TextFormatting.RED
+                    : totalWarn > 0 ? TextFormatting.YELLOW : TextFormatting.GREEN,
+                    "chat.ae2enhanced.diag.all_done", totalWarn, totalError));
             return;
         }
         SystemCheck check = DiagChecks.byName(system);
         if (check == null) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Diag] 未知系统: " + system + " (可用: all|"
-                    + String.join("|", diagSystemNames()) + ")"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.diag.unknown_system",
+                    system, "all|" + String.join("|", diagSystemNames())));
             return;
         }
         sendCheckResults(sender, check, DiagChecks.runOne(server, check));
     }
 
     private void sendCheckResults(@Nonnull ICommandSender sender, SystemCheck check, List<CheckResult> results) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Diag] === "
-                + check.displayName() + " (" + check.name() + ") ==="));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.diag.header",
+                new TextComponentTranslation(check.displayName()), check.name()));
         for (CheckResult r : results) {
             TextFormatting color;
             switch (r.level) {
@@ -543,18 +544,19 @@ public class CommandAE2Enhanced extends CommandBase {
                 case WARN: color = TextFormatting.YELLOW; break;
                 default: color = TextFormatting.RED; break;
             }
-            sender.sendMessage(new TextComponentString(color + "  [" + r.level + "] " + r.message));
+            TextComponentString line = new TextComponentString(color + "  [" + r.level + "] ");
+            line.appendSibling(r.toComponent());
+            sender.sendMessage(line);
         }
     }
 
     private void executeDiagReport(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Diag] 正在生成诊断报告..."));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.diag.report_generating"));
         File file = DiagReport.generate(server);
         if (file == null) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED + "[AE2E-Diag] 报告写入失败,详见服务端日志。"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.diag.report_failed"));
         } else {
-            sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                    + "[AE2E-Diag] 报告已写入: " + file.getPath()));
+            sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.diag.report_done", file.getPath()));
         }
     }
 
@@ -568,7 +570,7 @@ public class CommandAE2Enhanced extends CommandBase {
 
     private void executeDebug(@Nonnull ICommandSender sender, @Nonnull String[] args) {
         if (args.length < 2 || "list".equalsIgnoreCase(args[1])) {
-            sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Debug] 诊断开关:"));
+            sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.debug.switches"));
             for (String name : DiagSwitch.names()) {
                 sendSwitchState(sender, name);
             }
@@ -576,8 +578,8 @@ public class CommandAE2Enhanced extends CommandBase {
         }
         String name = args[1].toLowerCase();
         if (!DiagSwitch.isKnown(name)) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Debug] 未知开关: " + name + " (可用: " + String.join("|", DiagSwitch.names()) + ")"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.debug.unknown",
+                    name, String.join("|", DiagSwitch.names())));
             return;
         }
         if (args.length < 3 || "status".equalsIgnoreCase(args[2])) {
@@ -587,18 +589,15 @@ public class CommandAE2Enhanced extends CommandBase {
         switch (args[2].toLowerCase()) {
             case "on":
                 DiagSwitch.setOverride(name, true);
-                sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                        + "[AE2E-Debug] " + name + " 已开启(运行期覆盖,重启后失效)"));
+                sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.debug.on", name));
                 break;
             case "off":
                 DiagSwitch.setOverride(name, false);
-                sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                        + "[AE2E-Debug] " + name + " 已关闭(运行期覆盖,重启后失效)"));
+                sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.debug.off", name));
                 break;
             case "reset":
                 DiagSwitch.clearOverride(name);
-                sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                        + "[AE2E-Debug] " + name + " 已恢复内置默认值"));
+                sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.debug.reset", name));
                 break;
             default:
                 sender.sendMessage(new TextComponentString(TextFormatting.RED
@@ -608,10 +607,12 @@ public class CommandAE2Enhanced extends CommandBase {
 
     private void sendSwitchState(@Nonnull ICommandSender sender, String name) {
         boolean enabled = DiagSwitch.isEnabled(name);
-        String state = enabled ? TextFormatting.GREEN + "ON" : TextFormatting.GRAY + "OFF";
-        String source = DiagSwitch.hasOverride(name) ? "运行期覆盖" : "内置默认";
-        sender.sendMessage(new TextComponentString(TextFormatting.YELLOW + "  " + name
-                + ": " + state + TextFormatting.GRAY + " (" + source + ")"));
+        ITextComponent state = msg(enabled ? TextFormatting.GREEN : TextFormatting.GRAY,
+                enabled ? "chat.ae2enhanced.debug.state_on" : "chat.ae2enhanced.debug.state_off");
+        ITextComponent source = msg(TextFormatting.GRAY,
+                DiagSwitch.hasOverride(name)
+                        ? "chat.ae2enhanced.debug.source_override" : "chat.ae2enhanced.debug.source_default");
+        sender.sendMessage(msg(TextFormatting.YELLOW, "chat.ae2enhanced.debug.state", name, state, source));
     }
 
     // ---- performance ----
@@ -654,8 +655,8 @@ public class CommandAE2Enhanced extends CommandBase {
     }
 
     private void executePerfTps(@Nonnull ICommandSender sender) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Perf] 服务器 TPS/tick 耗时"
-                + (DiagSwitch.isEnabled(DiagSwitch.PERF) ? "" : " (采集已关闭,以下为历史数据)")));
+        sender.sendMessage(msg(TextFormatting.AQUA, DiagSwitch.isEnabled(DiagSwitch.PERF)
+                ? "chat.ae2enhanced.perf.tps_header" : "chat.ae2enhanced.perf.tps_header_off"));
         sendTpsWindow(sender, "5s", 100);
         sendTpsWindow(sender, "1min", 1200);
         sendTpsWindow(sender, "2min", 2400);
@@ -664,12 +665,12 @@ public class CommandAE2Enhanced extends CommandBase {
     private void sendTpsWindow(@Nonnull ICommandSender sender, String label, int window) {
         TpsTracker.Stats stats = TpsTracker.stats(window);
         if (stats == null) {
-            sender.sendMessage(new TextComponentString(TextFormatting.GRAY + "  " + label + ": 暂无数据"));
+            sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.no_data", label));
             return;
         }
         TextFormatting color = stats.tps >= 19.5 ? TextFormatting.GREEN
                 : stats.tps >= 15.0 ? TextFormatting.YELLOW : TextFormatting.RED;
-        sender.sendMessage(new TextComponentString(color + "  " + label + ": " + stats));
+        sender.sendMessage(msg(color, "chat.ae2enhanced.perf.tps_line", label, String.valueOf(stats)));
     }
 
     private void executePerfTop(@Nonnull ICommandSender sender, @Nonnull String[] args) {
@@ -677,42 +678,36 @@ public class CommandAE2Enhanced extends CommandBase {
         int limit = args.length >= 4 ? parsePositiveInt(args[3], 10) : 10;
         PerfAnalyzer.ScanResult scan = PerfAnalyzer.scan(-1.0);
         if ("grid".equals(scope)) {
-            sender.sendMessage(new TextComponentString(TextFormatting.AQUA
-                    + "[AE2E-Perf] 网格 tick 耗时 Top" + limit + ":"));
+            sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.top_grid_header", limit));
             int rank = 0;
             for (PerfAnalyzer.GridStat gs : scan.grids) {
                 if (++rank > limit) break;
-                sender.sendMessage(new TextComponentString(TextFormatting.YELLOW + "  #" + rank
-                        + TextFormatting.WHITE + " 节点=" + gs.nodes
-                        + " 耗时=" + PerfAnalyzer.formatNanos(gs.totalAvgNanos)
-                        + " 功耗=" + formatDouble(gs.avgPowerUsage) + "AE/t"
-                        + " CPU=" + gs.cpuBusy + "/" + gs.cpuTotal
-                        + TextFormatting.GRAY + " (" + gs.controllerState + ")"));
+                sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.grid_line",
+                        rank, gs.nodes, PerfAnalyzer.formatNanos(gs.totalAvgNanos),
+                        formatDouble(gs.avgPowerUsage), gs.cpuBusy, gs.cpuTotal,
+                        String.valueOf(gs.controllerState)));
             }
             if (rank == 0) {
-                sender.sendMessage(new TextComponentString(TextFormatting.GRAY + "  (无网格)"));
+                sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.no_grids"));
             }
         } else if ("machine".equals(scope)) {
-            sender.sendMessage(new TextComponentString(TextFormatting.AQUA
-                    + "[AE2E-Perf] 机器类 tick 耗时 Top" + limit + "(跨全部网格):"));
+            sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.top_machine_header", limit));
             int rank = 0;
             for (PerfAnalyzer.MachineStat ms : scan.machines) {
                 if (++rank > limit) break;
-                sender.sendMessage(new TextComponentString(TextFormatting.YELLOW + "  #" + rank
-                        + TextFormatting.WHITE + " " + ms.className
-                        + " 节点=" + ms.nodes
-                        + " 总耗时=" + PerfAnalyzer.formatNanos(ms.totalAvgNanos)));
+                sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.machine_line",
+                        rank, ms.className, ms.nodes, PerfAnalyzer.formatNanos(ms.totalAvgNanos)));
             }
             if (rank == 0) {
-                sender.sendMessage(new TextComponentString(TextFormatting.GRAY + "  (无被跟踪的 tick 节点)"));
+                sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.no_tracked"));
             }
         } else {
             sender.sendMessage(new TextComponentString(TextFormatting.RED
                     + "Usage: /ae2e perf top <machine|grid> [n]"));
             return;
         }
-        sender.sendMessage(new TextComponentString(TextFormatting.GRAY
-                + "  扫描耗时: " + formatDouble(scan.scanMs()) + "ms"));
+        sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.scan_ms",
+                formatDouble(scan.scanMs())));
     }
 
     private void executePerfGrid(@Nonnull ICommandSender sender, @Nonnull String[] args) {
@@ -723,64 +718,60 @@ public class CommandAE2Enhanced extends CommandBase {
         int rank = parsePositiveInt(args[2], -1);
         PerfAnalyzer.ScanResult scan = PerfAnalyzer.scan(-1.0);
         if (rank < 1 || rank > scan.grids.size()) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Perf] 无效的网格序号: " + args[2] + " (共 " + scan.grids.size()
-                    + " 个网格,序号即 /ae2e perf top grid 中的排名)"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.invalid_rank",
+                    args[2], scan.grids.size()));
             return;
         }
         PerfAnalyzer.GridStat gs = scan.grids.get(rank - 1);
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Perf] 网格 #" + rank + ":"));
-        sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                + "  节点: " + gs.nodes + "  tick耗时: " + PerfAnalyzer.formatNanos(gs.totalAvgNanos)));
-        sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                + "  控制器: " + gs.controllerState
-                + "  功耗: " + formatDouble(gs.avgPowerUsage) + " AE/t"
-                + "  储能: " + formatDouble(gs.storedPower) + " AE"));
-        sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                + "  合成 CPU: " + gs.cpuBusy + " 忙碌 / " + gs.cpuTotal + " 总数"));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.grid_detail_header", rank));
+        sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.grid_detail_nodes",
+                gs.nodes, PerfAnalyzer.formatNanos(gs.totalAvgNanos)));
+        sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.grid_detail_power",
+                String.valueOf(gs.controllerState), formatDouble(gs.avgPowerUsage),
+                formatDouble(gs.storedPower)));
+        sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.grid_detail_cpus",
+                gs.cpuBusy, gs.cpuTotal));
     }
 
     private void executePerfSlow(@Nonnull ICommandSender sender, @Nonnull String[] args) {
         double thresholdMs = args.length >= 3 ? parsePositiveDouble(args[2], 1.0) : 1.0;
         int limit = args.length >= 4 ? parsePositiveInt(args[3], 10) : 10;
         PerfAnalyzer.ScanResult scan = PerfAnalyzer.scan(thresholdMs);
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA
-                + "[AE2E-Perf] 平均 tick 耗时 >= " + formatDouble(thresholdMs) + "ms 的节点 Top" + limit + ":"));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.slow_header",
+                formatDouble(thresholdMs), limit));
         int rank = 0;
         for (PerfAnalyzer.SlowNode sn : scan.slowNodes) {
             if (++rank > limit) break;
-            sender.sendMessage(new TextComponentString(TextFormatting.YELLOW + "  #" + rank
-                    + TextFormatting.WHITE + " " + sn.machine
-                    + " " + PerfAnalyzer.formatNanos(sn.avgNanos)
-                    + TextFormatting.GRAY + " @ " + sn.location));
+            sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.slow_line",
+                    rank, sn.machine, PerfAnalyzer.formatNanos(sn.avgNanos), sn.location));
         }
         if (rank == 0) {
-            sender.sendMessage(new TextComponentString(TextFormatting.GREEN + "  (无超阈值节点)"));
+            sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.perf.none_over"));
         }
-        sender.sendMessage(new TextComponentString(TextFormatting.GRAY
-                + "  扫描耗时: " + formatDouble(scan.scanMs()) + "ms"));
+        sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.scan_ms",
+                formatDouble(scan.scanMs())));
     }
 
     private void executePerfMetrics(@Nonnull ICommandSender sender) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Perf] 指标快照:"));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.metrics_header"));
         int shown = 0;
         for (com.github.aeddddd.ae2enhanced.diag.metrics.Counter c : MetricsRegistry.counters()) {
-            sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                    + "  [counter] " + c.name() + " = " + c.get()));
+            sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.metrics_counter",
+                    c.name(), c.get()));
             shown++;
         }
         for (com.github.aeddddd.ae2enhanced.diag.metrics.Timer t : MetricsRegistry.timers()) {
-            sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                    + "  [timer] " + t.name() + " " + t.snapshot()));
+            sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.metrics_timer",
+                    t.name(), t.snapshot().toString()));
             shown++;
         }
         for (com.github.aeddddd.ae2enhanced.diag.metrics.Gauge g : MetricsRegistry.gauges()) {
-            sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                    + "  [gauge] " + g.name() + " = " + formatDouble(g.get())));
+            sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.metrics_gauge",
+                    g.name(), formatDouble(g.get())));
             shown++;
         }
         if (shown == 0) {
-            sender.sendMessage(new TextComponentString(TextFormatting.GRAY + "  (无已注册指标)"));
+            sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.metrics_empty"));
         }
     }
 
@@ -806,6 +797,13 @@ public class CommandAE2Enhanced extends CommandBase {
         return String.format(java.util.Locale.ROOT, "%.2f", v);
     }
 
+    /** 带颜色的本地化消息组件（客户端按各自语言渲染）。 */
+    private static ITextComponent msg(TextFormatting color, String key, Object... args) {
+        TextComponentTranslation t = new TextComponentTranslation(key, args);
+        t.getStyle().setColor(color);
+        return t;
+    }
+
     private void executePerfBaseline(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender,
                                      @Nonnull String[] args) {
         if (args.length < 3) {
@@ -817,50 +815,42 @@ public class CommandAE2Enhanced extends CommandBase {
             case "set": {
                 PerfBaseline.Baseline b = PerfBaseline.capture(server);
                 if (b == null) {
-                    sender.sendMessage(new TextComponentString(TextFormatting.RED
-                            + "[AE2E-Perf] TPS 数据不足(服务器启动未满 1 分钟),稍后重试。"));
+                    sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.baseline_no_data"));
                     return;
                 }
                 if (PerfBaseline.save(server, b)) {
-                    sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                            + "[AE2E-Perf] 基准线已建立: tick平均=" + formatDouble(b.avgTickMs) + "ms"
-                            + " 网格总耗时=" + PerfAnalyzer.formatNanos(b.gridTotalNanos)
-                            + " 机器类=" + b.machineTotals.size() + " 个"
-                            + " 预警倍数=" + formatDouble(b.alertMultiplier)));
+                    sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.perf.baseline_set",
+                            formatDouble(b.avgTickMs), PerfAnalyzer.formatNanos(b.gridTotalNanos),
+                            b.machineTotals.size(), formatDouble(b.alertMultiplier)));
                 } else {
-                    sender.sendMessage(new TextComponentString(TextFormatting.RED
-                            + "[AE2E-Perf] 基准线写入失败,详见服务端日志。"));
+                    sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.baseline_save_failed"));
                 }
                 break;
             }
             case "show": {
                 PerfBaseline.Baseline b = PerfBaseline.load(server);
                 if (b == null) {
-                    sender.sendMessage(new TextComponentString(TextFormatting.YELLOW
-                            + "[AE2E-Perf] 尚无基准线,使用 /ae2e perf baseline set 建立。"));
+                    sender.sendMessage(msg(TextFormatting.YELLOW, "chat.ae2enhanced.perf.baseline_none"));
                     return;
                 }
-                sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Perf] 当前基准线:"));
-                sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                        + "  建立时间: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-                        .format(new java.util.Date(b.createdAt))));
-                sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                        + "  tick平均: " + formatDouble(b.avgTickMs) + "ms"
-                        + "  网格总耗时: " + PerfAnalyzer.formatNanos(b.gridTotalNanos)
-                        + "  预警倍数: " + formatDouble(b.alertMultiplier)));
+                sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.baseline_show_header"));
+                sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.baseline_created",
+                        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                                .format(new java.util.Date(b.createdAt))));
+                sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.perf.baseline_summary",
+                        formatDouble(b.avgTickMs), PerfAnalyzer.formatNanos(b.gridTotalNanos),
+                        formatDouble(b.alertMultiplier)));
                 for (Map.Entry<String, Long> e : b.machineTotals.entrySet()) {
-                    sender.sendMessage(new TextComponentString(TextFormatting.GRAY
-                            + "  " + e.getKey() + ": " + PerfAnalyzer.formatNanos(e.getValue())));
+                    sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.baseline_machine",
+                            e.getKey(), PerfAnalyzer.formatNanos(e.getValue())));
                 }
                 break;
             }
             case "clear": {
                 if (PerfBaseline.clear(server)) {
-                    sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                            + "[AE2E-Perf] 基准线已清除,预警已停用。"));
+                    sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.perf.baseline_cleared"));
                 } else {
-                    sender.sendMessage(new TextComponentString(TextFormatting.YELLOW
-                            + "[AE2E-Perf] 基准线不存在。"));
+                    sender.sendMessage(msg(TextFormatting.YELLOW, "chat.ae2enhanced.perf.baseline_not_exist"));
                 }
                 break;
             }
@@ -873,11 +863,9 @@ public class CommandAE2Enhanced extends CommandBase {
     private void executePerfExport(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender) {
         File file = PerfExporter.export(server);
         if (file == null) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Perf] 导出失败,详见服务端日志。"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.export_failed"));
         } else {
-            sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                    + "[AE2E-Perf] 已导出: " + file.getPath()));
+            sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.perf.export_done", file.getPath()));
         }
     }
 
@@ -885,29 +873,27 @@ public class CommandAE2Enhanced extends CommandBase {
                                   @Nonnull String[] args) {
         PerfBaseline.Baseline b = PerfBaseline.load(server);
         if (args.length < 3) {
-            sender.sendMessage(new TextComponentString(TextFormatting.AQUA
-                    + "[AE2E-Perf] 当前预警倍数: " + (b == null ? "未建立基准线(预警停用)"
-                    : formatDouble(b.alertMultiplier))));
+            Object mult = b == null
+                    ? msg(TextFormatting.GRAY, "chat.ae2enhanced.perf.alert_no_baseline")
+                    : formatDouble(b.alertMultiplier);
+            sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.perf.alert_current", mult));
             return;
         }
         double mult = parsePositiveDouble(args[2], -1.0);
         if (mult <= 0) {
             sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "Usage: /ae2e perf alert <multiplier> (正数,如 1.5)"));
+                    + "Usage: /ae2e perf alert <multiplier> (e.g. 1.5)"));
             return;
         }
         if (b == null) {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Perf] 请先 /ae2e perf baseline set 建立基准线。"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.alert_need_baseline"));
             return;
         }
         b.alertMultiplier = mult;
         if (PerfBaseline.save(server, b)) {
-            sender.sendMessage(new TextComponentString(TextFormatting.GREEN
-                    + "[AE2E-Perf] 预警倍数已设为 " + formatDouble(mult)));
+            sender.sendMessage(msg(TextFormatting.GREEN, "chat.ae2enhanced.perf.alert_set", formatDouble(mult)));
         } else {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED
-                    + "[AE2E-Perf] 写入失败,详见服务端日志。"));
+            sender.sendMessage(msg(TextFormatting.RED, "chat.ae2enhanced.perf.baseline_save_failed"));
         }
     }
 
@@ -934,9 +920,9 @@ public class CommandAE2Enhanced extends CommandBase {
 
     /** 效果评估：各计划路径的执行次数与计算耗时分布 + 守恒校验结果。 */
     private void executePlanStats(@Nonnull ICommandSender sender) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA
-                + "[AE2E-Plan] 计划路径统计(守恒校验: "
-                + (DiagSwitch.isEnabled(DiagSwitch.PLAN_VERIFY) ? "开启" : "关闭") + "):"));
+        ITextComponent verifyState = msg(TextFormatting.GRAY, DiagSwitch.isEnabled(DiagSwitch.PLAN_VERIFY)
+                ? "chat.ae2enhanced.debug.state_on" : "chat.ae2enhanced.debug.state_off");
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.plan.stats_header", verifyState));
         String[] paths = {"special", "dag", "dagFallback", "native"};
         for (String path : paths) {
             long count = MetricsRegistry.counter("plan.path." + path).get();
@@ -945,22 +931,20 @@ public class CommandAE2Enhanced extends CommandBase {
             if (count == 0 && snap.count == 0) {
                 continue;
             }
-            sender.sendMessage(new TextComponentString(TextFormatting.WHITE + "  " + path
-                    + ": 次数=" + count + " 计算耗时 avg=" + formatDouble(snap.avgMs) + "ms"
-                    + " max=" + formatDouble(snap.maxMs) + "ms"
-                    + " p95=" + formatDouble(snap.p95Ms) + "ms"));
+            sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.plan.stats_line",
+                    path, count, formatDouble(snap.avgMs), formatDouble(snap.maxMs),
+                    formatDouble(snap.p95Ms)));
         }
         long passed = MetricsRegistry.counter("plan.verify.passed").get();
         long violations = MetricsRegistry.counter("plan.verify.violation").get();
         long skipped = MetricsRegistry.counter("plan.verify.skippedSimulation").get();
         TextFormatting color = violations > 0 ? TextFormatting.RED : TextFormatting.GREEN;
-        sender.sendMessage(new TextComponentString(color + "  守恒校验: 通过=" + passed
-                + " 违反=" + violations + " 跳过(模拟计划)=" + skipped));
+        sender.sendMessage(msg(color, "chat.ae2enhanced.plan.verify_summary", passed, violations, skipped));
     }
 
     /** 执行状态追踪：列出全部忙碌中的合成 CPU 及进度。 */
     private void executePlanRunning(@Nonnull ICommandSender sender) {
-        sender.sendMessage(new TextComponentString(TextFormatting.AQUA + "[AE2E-Plan] 执行中的合成任务:"));
+        sender.sendMessage(msg(TextFormatting.AQUA, "chat.ae2enhanced.plan.running_header"));
         int shown = 0;
         for (appeng.me.Grid grid : appeng.hooks.TickHandler.INSTANCE.getGridList()) {
             if (grid.isEmpty()) {
@@ -979,16 +963,23 @@ public class CommandAE2Enhanced extends CommandBase {
                 long elapsedMs = cpu instanceof appeng.me.cluster.implementations.CraftingCPUCluster
                         ? ((appeng.me.cluster.implementations.CraftingCPUCluster) cpu).getElapsedTime() / 1_000_000L
                         : -1L;
-                sender.sendMessage(new TextComponentString(TextFormatting.WHITE
-                        + "  " + (cpu.getName().isEmpty() ? "(未命名CPU)" : cpu.getName())
-                        + " 输出=" + cpu.getFinalOutput()
-                        + " 进度=" + progress + "(" + (start - remaining) + "/" + start + ")"
-                        + " 协处理器=" + cpu.getCoProcessors()
-                        + (elapsedMs >= 0 ? " 已运行=" + formatDouble(elapsedMs / 1000.0) + "s" : "")));
+                Object name = cpu.getName().isEmpty()
+                        ? new TextComponentTranslation("chat.ae2enhanced.plan.unnamed_cpu")
+                        : cpu.getName();
+                if (elapsedMs >= 0) {
+                    sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.plan.running_line",
+                            name, String.valueOf(cpu.getFinalOutput()), progress,
+                            start - remaining, start, cpu.getCoProcessors(),
+                            formatDouble(elapsedMs / 1000.0)));
+                } else {
+                    sender.sendMessage(msg(TextFormatting.WHITE, "chat.ae2enhanced.plan.running_line_no_elapsed",
+                            name, String.valueOf(cpu.getFinalOutput()), progress,
+                            start - remaining, start, cpu.getCoProcessors()));
+                }
             }
         }
         if (shown == 0) {
-            sender.sendMessage(new TextComponentString(TextFormatting.GRAY + "  (无忙碌中的合成 CPU)"));
+            sender.sendMessage(msg(TextFormatting.GRAY, "chat.ae2enhanced.plan.running_none"));
         }
     }
 

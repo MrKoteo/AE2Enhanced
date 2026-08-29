@@ -68,6 +68,9 @@ public abstract class MixinGuiCraftingCPU implements IPlanViewHost {
     @Unique
     private final CraftingDurationTracker ae2enhanced$durations = new CraftingDurationTracker();
 
+    @Unique
+    private final PlanViewHelper.ViewStats ae2enhanced$stats = new PlanViewHelper.ViewStats();
+
     // ==================== 列表重建(排序 + 搜索过滤) ====================
 
     @Inject(method = "postUpdate", at = @At("TAIL"))
@@ -79,28 +82,37 @@ public abstract class MixinGuiCraftingCPU implements IPlanViewHost {
     @Unique
     private void ae2enhanced$refreshView() {
         PlanViewHelper.refreshCpu(this.visual, this.storage, this.active, this.pending,
-                this.ae2enhanced$searchText, PlanViewHelper.cpuMode(), this.ae2enhanced$durations);
+                this.ae2enhanced$searchText, PlanViewHelper.cpuMode(), this.ae2enhanced$durations,
+                this.ae2enhanced$stats);
         // 原生 setScrollBar 已在重建前执行, 用过滤后的尺寸重设范围(6 行视图)
         ((MixinAEBaseGuiAccessor) this).ae2enhanced$getMyScrollBar()
                 .setRange(0, (this.visual.size() + 2) / 3 - 6, 1);
+    }
+
+    @Unique
+    private boolean ae2enhanced$isStatusScreen() {
+        return (Object) this instanceof GuiCraftingStatus;
     }
 
     // ==================== 排序按钮 + 搜索框 ====================
 
     @Inject(method = "func_73866_w_", at = @At("TAIL"))
     private void ae2enhanced$onInitGui(CallbackInfo ci) {
-        // GuiCraftingStatus(CPU 选择界面)继承 GuiCraftingCPU 且底部按钮行无空位,
-        // 不为其添加排序按钮与搜索框(排序/计时 overlay 仍通过 super 调用链生效)
-        if ((Object) this instanceof GuiCraftingStatus) {
-            return;
-        }
         GuiContainer self = (GuiContainer) (Object) this;
         int guiLeft = self.getGuiLeft();
         int guiTop = self.getGuiTop();
         FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
-        this.ae2enhanced$sortButton = new GuiButton(3092, guiLeft + 6, guiTop + 159, 100, 20, "");
-        ((IGuiScreenAccessor) self).ae2enhanced$getButtonList().add(this.ae2enhanced$sortButton);
-        this.ae2enhanced$searchField = new GuiTextField(3093, fr, guiLeft + 154, guiTop + 4, 78, 12);
+        if (ae2enhanced$isStatusScreen()) {
+            // GuiCraftingStatus(CPU 选择界面)底行无空位: 排序按钮置于左侧 CPU 面板顶部,
+            // 搜索框收窄避开右上角 tab 按钮(标题截断相应收窄)
+            this.ae2enhanced$sortButton = new GuiButton(3092, guiLeft - 85, guiTop + 4, 76, 13, "");
+            ((IGuiScreenAccessor) self).ae2enhanced$getButtonList().add(this.ae2enhanced$sortButton);
+            this.ae2enhanced$searchField = new GuiTextField(3093, fr, guiLeft + 126, guiTop + 4, 82, 12);
+        } else {
+            this.ae2enhanced$sortButton = new GuiButton(3092, guiLeft + 6, guiTop + 159, 100, 20, "");
+            ((IGuiScreenAccessor) self).ae2enhanced$getButtonList().add(this.ae2enhanced$sortButton);
+            this.ae2enhanced$searchField = new GuiTextField(3093, fr, guiLeft + 154, guiTop + 4, 78, 12);
+        }
         this.ae2enhanced$searchField.setMaxStringLength(64);
         this.ae2enhanced$searchField.setText(this.ae2enhanced$searchText);
         ae2enhanced$updateSortButtonText();
@@ -197,7 +209,38 @@ public abstract class MixinGuiCraftingCPU implements IPlanViewHost {
     )
     private int ae2enhanced$truncateTitle(FontRenderer fr, String title, int x, int y, int color,
             Operation<Integer> original) {
-        return original.call(fr, PlanViewHelper.truncateTitle(title), x, y, color);
+        // CPU 选择界面右上角有 tab 按钮, 标题截断相应收窄
+        return original.call(fr, PlanViewHelper.truncateTitle(title, ae2enhanced$isStatusScreen() ? 110 : 140),
+                x, y, color);
+    }
+
+    // ==================== 汇总统计行 ====================
+
+    @Inject(method = "drawFG", at = @At("TAIL"), require = 0)
+    private void ae2enhanced$drawSummary(int offsetX, int offsetY, int mouseX, int mouseY,
+            CallbackInfo ci) {
+        try {
+            if (this.ae2enhanced$stats.total <= 0) {
+                return;
+            }
+            FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
+            String activeLine = I18n.format("gui.ae2enhanced.cpu.summary.active", this.ae2enhanced$stats.second);
+            String queuedLine = I18n.format("gui.ae2enhanced.cpu.summary.queued", this.ae2enhanced$stats.third);
+            if (ae2enhanced$isStatusScreen()) {
+                // CPU 选择界面: 左侧 CPU 面板下方(纹理外区域, 用亮色文字)
+                fr.drawString(activeLine, -83, 160, 0xAAAAAA);
+                fr.drawString(queuedLine, -83, 170, 0xAAAAAA);
+            } else {
+                // 方块 GUI: 底部按钮行中央空位, 0.75 缩放
+                GlStateManager.pushMatrix();
+                GlStateManager.scale(0.75, 0.75, 0.75);
+                fr.drawString(activeLine, 146, 214, 0x404040);
+                fr.drawString(queuedLine, 146, 226, 0x404040);
+                GlStateManager.popMatrix();
+            }
+        } catch (Throwable ignored) {
+            // 渲染增强失败静默
+        }
     }
 
     // ==================== 子项持续时间: tooltip 追加 ====================

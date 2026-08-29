@@ -58,14 +58,20 @@ gui.ae2enhanced.special_plan.rounds_desc=~%s dispatch rounds
 gui.ae2enhanced.special_plan.normal_calls=%s calls
 gui.ae2enhanced.plan_sort.button=Sort: %s
 gui.ae2enhanced.plan_sort.hint=Click: next mode | Shift+Click: previous mode
-gui.ae2enhanced.plan_sort.mode.missing_first=Missing First
-gui.ae2enhanced.plan_sort.mode.total_desc=By Amount
-gui.ae2enhanced.plan_sort.mode.to_craft_desc=By To-Craft
-gui.ae2enhanced.plan_sort.mode.special_first=Special Plan First
-gui.ae2enhanced.plan_sort.mode.active_first=Active First
-gui.ae2enhanced.plan_sort.mode.duration_desc=By Elapsed Time
+gui.ae2enhanced.plan_sort.mode.missing_first=Missing
+gui.ae2enhanced.plan_sort.mode.total_desc=Amount
+gui.ae2enhanced.plan_sort.mode.to_craft_desc=To-Craft
+gui.ae2enhanced.plan_sort.mode.special_first=Special
+gui.ae2enhanced.plan_sort.mode.active_first=Active
+gui.ae2enhanced.plan_sort.mode.duration_desc=Elapsed
 gui.ae2enhanced.plan_search.hint=Type to filter items in the plan
 gui.ae2enhanced.cpu.item_elapsed=Elapsed: %s
+gui.ae2enhanced.cpu.summary.active=Active %s
+gui.ae2enhanced.cpu.summary.queued=Queued %s
+gui.ae2enhanced.plan_summary.total=Total: %s
+gui.ae2enhanced.plan_summary.stored=Available: %s
+gui.ae2enhanced.plan_summary.to_craft=To Craft: %s
+gui.ae2enhanced.plan_summary.missing=Missing: %s
 gui.ae2enhanced.unformed.subtitle=Supercausal Assembly Hub
 gui.ae2enhanced.unformed.ready=Structure Complete — Ready to Assemble
 gui.ae2enhanced.unformed.hint=Click the button below to assemble
@@ -696,3 +702,136 @@ item.ae2enhanced.network_link_credential.features.1=Tier I + flight, speed, jump
 item.ae2enhanced.network_link_credential.features.2=Tier II + wall phase, death block (60s cd)
 item.ae2enhanced.network_link_credential.features.3=All tiers + force flight, full damage immunity, saturation, item/displacement protection
 item.ae2enhanced.network_link_credential.hint=RMB: config | Shift+V: fly | B: heal
+
+# Diagnostics & Performance (/ae2e diag|debug|perf|plan)
+chat.ae2enhanced.command.no_permission=[AE2E] You do not have permission to use this subcommand.
+
+chat.ae2enhanced.diag.all_done=[AE2E-Diag] All system checks complete: WARN=%d ERROR=%d
+chat.ae2enhanced.diag.unknown_system=[AE2E-Diag] Unknown system: %s (available: %s)
+chat.ae2enhanced.diag.header=[AE2E-Diag] === %s (%s) ===
+chat.ae2enhanced.diag.report_generating=[AE2E-Diag] Generating diagnostic report...
+chat.ae2enhanced.diag.report_failed=[AE2E-Diag] Failed to write report, see server log.
+chat.ae2enhanced.diag.report_done=[AE2E-Diag] Report written to: %s
+
+chat.ae2enhanced.debug.switches=[AE2E-Debug] Diagnostic switches:
+chat.ae2enhanced.debug.unknown=[AE2E-Debug] Unknown switch: %s (available: %s)
+chat.ae2enhanced.debug.on=[AE2E-Debug] %s enabled (runtime override, resets on restart)
+chat.ae2enhanced.debug.off=[AE2E-Debug] %s disabled (runtime override, resets on restart)
+chat.ae2enhanced.debug.reset=[AE2E-Debug] %s reset to built-in default
+chat.ae2enhanced.debug.state=  %s: %s (%s)
+chat.ae2enhanced.debug.state_on=ON
+chat.ae2enhanced.debug.state_off=OFF
+chat.ae2enhanced.debug.source_override=runtime override
+chat.ae2enhanced.debug.source_default=built-in default
+
+chat.ae2enhanced.check.storage.name=Hyperdimensional Storage
+chat.ae2enhanced.check.storage.exception=Storage check failed: %s
+chat.ae2enhanced.check.storage.controller_unformed=Controller not formed: %s
+chat.ae2enhanced.check.storage.controller_safe_mode=Controller in safe mode (storage section corrupted): %s
+chat.ae2enhanced.check.storage.controller_inactive=Controller network inactive: %s
+chat.ae2enhanced.check.storage.controller_unpowered=Controller network under-powered: %s
+chat.ae2enhanced.check.storage.controllers_summary=Loaded controllers: %d (formed %d)
+chat.ae2enhanced.check.storage.overworld_unavailable=Overworld unavailable, disk save check skipped
+chat.ae2enhanced.check.storage.no_save_dir=Disk save directory does not exist (no storage data yet)
+chat.ae2enhanced.check.storage.empty_save_dir=Disk save directory is empty
+chat.ae2enhanced.check.storage.header_corrupt=Save %s header corrupted: %s
+chat.ae2enhanced.check.storage.bad_uuid_name=Save %s is not a valid UUID name
+chat.ae2enhanced.check.storage.saves_summary=Disk saves: %d (healthy %d, currently unloaded %d)
+chat.ae2enhanced.check.storage.hdr_short=file shorter than %d bytes
+chat.ae2enhanced.check.storage.hdr_magic=magic mismatch (%s)
+chat.ae2enhanced.check.storage.hdr_version=invalid version: %d
+chat.ae2enhanced.check.storage.hdr_read=read failed: %s
+
+chat.ae2enhanced.check.channels.name=Storage Channel Registration
+chat.ae2enhanced.check.channels.exception=Channel check failed: %s
+chat.ae2enhanced.check.channels.registered=Registered channels: %d %s
+chat.ae2enhanced.check.channels.energy_missing=Energy channel missing (Flux Applied unavailable and AE2E channel not registered)
+chat.ae2enhanced.check.channels.mana_missing=Mana channel missing (Botania installed but channel not registered)
+chat.ae2enhanced.check.channels.mana_unexpected=Mana channel registered but Botania not installed
+chat.ae2enhanced.check.channels.starlight_missing=Starlight channel missing (Astral Sorcery installed but channel not registered)
+chat.ae2enhanced.check.channels.starlight_unexpected=Starlight channel registered but Astral Sorcery not installed
+chat.ae2enhanced.check.channels.gas_ok=Gas channel registered (mekeng)
+chat.ae2enhanced.check.channels.gas_missing=mekeng installed but gas channel not registered
+chat.ae2enhanced.check.channels.essentia_ok=Essentia channel registered (thaumicenergistics)
+chat.ae2enhanced.check.channels.essentia_missing=thaumicenergistics installed but essentia channel not registered
+
+chat.ae2enhanced.check.recipes.name=Crafting Recipe Registries
+chat.ae2enhanced.check.recipes.exception=Recipe check failed: %s
+chat.ae2enhanced.check.recipes.blackhole_ok=Black Hole recipes: %d
+chat.ae2enhanced.check.recipes.blackhole_empty=Black Hole recipe registry is empty (possibly removed by CraftTweaker)
+chat.ae2enhanced.check.recipes.ritual_ok=Singularity Ritual recipes: %d
+chat.ae2enhanced.check.recipes.ritual_empty=Singularity Ritual recipe registry is empty (possibly removed by CraftTweaker)
+chat.ae2enhanced.check.recipes.chamber_ok=Singularity Chamber recipes: %d, byType=%s
+chat.ae2enhanced.check.recipes.chamber_empty=Singularity Chamber recipe index is empty
+
+chat.ae2enhanced.check.grid.name=AE2 Grid
+chat.ae2enhanced.check.grid.exception=Grid check failed: %s
+chat.ae2enhanced.check.grid.summary=Grids: %d, nodes: %d, avg power draw: %s AE/t
+chat.ae2enhanced.check.grid.cpus=Crafting CPUs: %d (busy %d)
+chat.ae2enhanced.check.grid.empty_grids=Empty grids: %d
+chat.ae2enhanced.check.grid.controller_conflicts=Grids with controller conflicts: %d
+chat.ae2enhanced.check.grid.unpowered=Grids suspected unpowered (power draw but zero stored energy): %d
+
+chat.ae2enhanced.check.personaldim.name=Personal Dimension
+chat.ae2enhanced.check.personaldim.exception=Personal dimension check failed: %s
+chat.ae2enhanced.check.personaldim.overworld_unavailable=Overworld unavailable, personal dimension check skipped
+chat.ae2enhanced.check.personaldim.orphan=Player %s's dimension %d is not registered (orphan entry)
+chat.ae2enhanced.check.personaldim.conflict=Player %s's dimension %d is occupied by another dimension type (ID conflict)
+chat.ae2enhanced.check.personaldim.entries_summary=Entries: %d (assigned dimension %d, unassigned %d)
+chat.ae2enhanced.check.personaldim.all_consistent=All dimension registrations are consistent
+
+chat.ae2enhanced.perf.tps_header=[AE2E-Perf] Server TPS / tick time
+chat.ae2enhanced.perf.tps_header_off=[AE2E-Perf] Server TPS / tick time (collection disabled, showing historical data)
+chat.ae2enhanced.perf.tps_line=  %s: %s
+chat.ae2enhanced.perf.no_data=  %s: no data
+chat.ae2enhanced.perf.top_grid_header=[AE2E-Perf] Grid tick time Top%d:
+chat.ae2enhanced.perf.grid_line=  #%d nodes=%d time=%s power=%sAE/t CPU=%d/%d (%s)
+chat.ae2enhanced.perf.no_grids=  (no grids)
+chat.ae2enhanced.perf.top_machine_header=[AE2E-Perf] Machine tick time Top%d (all grids):
+chat.ae2enhanced.perf.machine_line=  #%d %s nodes=%d total=%s
+chat.ae2enhanced.perf.no_tracked=  (no tracked ticking nodes)
+chat.ae2enhanced.perf.scan_ms=  Scan time: %sms
+chat.ae2enhanced.perf.invalid_rank=[AE2E-Perf] Invalid grid rank: %s (%d grids total; rank = position in /ae2e perf top grid)
+chat.ae2enhanced.perf.grid_detail_header=[AE2E-Perf] Grid #%d:
+chat.ae2enhanced.perf.grid_detail_nodes=  Nodes: %d  tick time: %s
+chat.ae2enhanced.perf.grid_detail_power=  Controller: %s  power: %s AE/t  stored: %s AE
+chat.ae2enhanced.perf.grid_detail_cpus=  Crafting CPUs: %d busy / %d total
+chat.ae2enhanced.perf.slow_header=[AE2E-Perf] Nodes with avg tick time >= %sms Top%d:
+chat.ae2enhanced.perf.slow_line=  #%d %s %s @ %s
+chat.ae2enhanced.perf.none_over=  (no nodes above threshold)
+chat.ae2enhanced.perf.metrics_header=[AE2E-Perf] Metrics snapshot:
+chat.ae2enhanced.perf.metrics_counter=  [counter] %s = %d
+chat.ae2enhanced.perf.metrics_timer=  [timer] %s %s
+chat.ae2enhanced.perf.metrics_gauge=  [gauge] %s = %s
+chat.ae2enhanced.perf.metrics_empty=  (no registered metrics)
+chat.ae2enhanced.perf.baseline_no_data=[AE2E-Perf] Insufficient TPS data (server up less than 1 minute), try again later.
+chat.ae2enhanced.perf.baseline_set=[AE2E-Perf] Baseline established: avgTick=%sms gridTotal=%s machines=%d multiplier=%s
+chat.ae2enhanced.perf.baseline_save_failed=[AE2E-Perf] Failed to write baseline, see server log.
+chat.ae2enhanced.perf.baseline_none=[AE2E-Perf] No baseline yet, use /ae2e perf baseline set.
+chat.ae2enhanced.perf.baseline_show_header=[AE2E-Perf] Current baseline:
+chat.ae2enhanced.perf.baseline_created=  Created at: %s
+chat.ae2enhanced.perf.baseline_summary=  avgTick: %sms  gridTotal: %s  multiplier: %s
+chat.ae2enhanced.perf.baseline_machine=  %s: %s
+chat.ae2enhanced.perf.baseline_cleared=[AE2E-Perf] Baseline cleared, alerts disabled.
+chat.ae2enhanced.perf.baseline_not_exist=[AE2E-Perf] Baseline does not exist.
+chat.ae2enhanced.perf.export_failed=[AE2E-Perf] Export failed, see server log.
+chat.ae2enhanced.perf.export_done=[AE2E-Perf] Exported: %s
+chat.ae2enhanced.perf.alert_current=[AE2E-Perf] Current alert multiplier: %s
+chat.ae2enhanced.perf.alert_no_baseline=no baseline (alerts disabled)
+chat.ae2enhanced.perf.alert_need_baseline=[AE2E-Perf] Run /ae2e perf baseline set first.
+chat.ae2enhanced.perf.alert_set=[AE2E-Perf] Alert multiplier set to %s
+chat.ae2enhanced.perf.alert.header=[AE2E-Perf] Performance anomaly alert:
+chat.ae2enhanced.perf.alert.line=  %s
+chat.ae2enhanced.perf.alert.hint=  Use /ae2e perf top / slow to locate the source, /ae2e perf baseline set to rebuild the baseline
+chat.ae2enhanced.perf.alert.tick=Avg tick time %sms exceeds %sx baseline %sms
+chat.ae2enhanced.perf.alert.grid_total=Total grid tick time %s exceeds %sx baseline %s
+chat.ae2enhanced.perf.alert.machine=Machine class %s time %s exceeds %sx baseline %s
+
+chat.ae2enhanced.plan.stats_header=[AE2E-Plan] Plan path stats (conservation check: %s):
+chat.ae2enhanced.plan.stats_line=  %s: count=%d compute avg=%sms max=%sms p95=%sms
+chat.ae2enhanced.plan.verify_summary=  Conservation check: passed=%d violated=%d skipped(simulated)=%d
+chat.ae2enhanced.plan.running_header=[AE2E-Plan] Running crafting tasks:
+chat.ae2enhanced.plan.unnamed_cpu=(unnamed CPU)
+chat.ae2enhanced.plan.running_line=  %s output=%s progress=%s(%d/%d) coProcessors=%d elapsed=%ss
+chat.ae2enhanced.plan.running_line_no_elapsed=  %s output=%s progress=%s(%d/%d) coProcessors=%d
+chat.ae2enhanced.plan.running_none=  (no busy crafting CPUs)

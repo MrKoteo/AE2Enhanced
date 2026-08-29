@@ -66,6 +66,12 @@ gui.ae2enhanced.plan_sort.mode.active_first=进行中优先
 gui.ae2enhanced.plan_sort.mode.duration_desc=按持续时间
 gui.ae2enhanced.plan_search.hint=输入以筛选计划中的物品
 gui.ae2enhanced.cpu.item_elapsed=已用时: %s
+gui.ae2enhanced.cpu.summary.active=合成中 %s
+gui.ae2enhanced.cpu.summary.queued=排队 %s
+gui.ae2enhanced.plan_summary.total=总计: %s
+gui.ae2enhanced.plan_summary.stored=库存: %s
+gui.ae2enhanced.plan_summary.to_craft=待合成: %s
+gui.ae2enhanced.plan_summary.missing=缺料: %s
 gui.ae2enhanced.unformed.subtitle=超因果装配枢纽
 gui.ae2enhanced.unformed.ready=结构完整 - 可以组装
 gui.ae2enhanced.unformed.hint=点击下方按钮进行组装
@@ -695,3 +701,136 @@ item.ae2enhanced.network_link_credential.features.1=飞行、速度、跳跃、�
 item.ae2enhanced.network_link_credential.features.2=穿墙、免死 (60s 冷却)
 item.ae2enhanced.network_link_credential.features.3=强制飞行、伤害免疫、饱食、物品与位移保护
 item.ae2enhanced.network_link_credential.hint=右键打开配置
+
+# 诊断与性能分析 (/ae2e diag|debug|perf|plan)
+chat.ae2enhanced.command.no_permission=[AE2E] 你没有权限使用该子命令。
+
+chat.ae2enhanced.diag.all_done=[AE2E-Diag] 全部系统检查完成: WARN=%d ERROR=%d
+chat.ae2enhanced.diag.unknown_system=[AE2E-Diag] 未知系统: %s (可用: %s)
+chat.ae2enhanced.diag.header=[AE2E-Diag] === %s (%s) ===
+chat.ae2enhanced.diag.report_generating=[AE2E-Diag] 正在生成诊断报告...
+chat.ae2enhanced.diag.report_failed=[AE2E-Diag] 报告写入失败,详见服务端日志。
+chat.ae2enhanced.diag.report_done=[AE2E-Diag] 报告已写入: %s
+
+chat.ae2enhanced.debug.switches=[AE2E-Debug] 诊断开关:
+chat.ae2enhanced.debug.unknown=[AE2E-Debug] 未知开关: %s (可用: %s)
+chat.ae2enhanced.debug.on=[AE2E-Debug] %s 已开启(运行期覆盖,重启后失效)
+chat.ae2enhanced.debug.off=[AE2E-Debug] %s 已关闭(运行期覆盖,重启后失效)
+chat.ae2enhanced.debug.reset=[AE2E-Debug] %s 已恢复内置默认值
+chat.ae2enhanced.debug.state=  %s: %s (%s)
+chat.ae2enhanced.debug.state_on=开启
+chat.ae2enhanced.debug.state_off=关闭
+chat.ae2enhanced.debug.source_override=运行期覆盖
+chat.ae2enhanced.debug.source_default=内置默认
+
+chat.ae2enhanced.check.storage.name=超维度仓储中枢
+chat.ae2enhanced.check.storage.exception=仓储检查执行异常: %s
+chat.ae2enhanced.check.storage.controller_unformed=控制器未成型: %s
+chat.ae2enhanced.check.storage.controller_safe_mode=控制器处于安全模式(存储分区损坏): %s
+chat.ae2enhanced.check.storage.controller_inactive=控制器网络未激活: %s
+chat.ae2enhanced.check.storage.controller_unpowered=控制器网络供电不足: %s
+chat.ae2enhanced.check.storage.controllers_summary=已加载控制器: %d 个(成型 %d 个)
+chat.ae2enhanced.check.storage.overworld_unavailable=主世界不可用,跳过磁盘存档检查
+chat.ae2enhanced.check.storage.no_save_dir=磁盘存档目录不存在(尚无仓储数据)
+chat.ae2enhanced.check.storage.empty_save_dir=磁盘存档目录为空
+chat.ae2enhanced.check.storage.header_corrupt=存档 %s 文件头损坏: %s
+chat.ae2enhanced.check.storage.bad_uuid_name=存档 %s 不是合法 UUID 命名
+chat.ae2enhanced.check.storage.saves_summary=磁盘存档: %d 个(健康 %d 个,当前未加载 %d 个)
+chat.ae2enhanced.check.storage.hdr_short=文件长度不足 %d 字节
+chat.ae2enhanced.check.storage.hdr_magic=Magic 不匹配(%s)
+chat.ae2enhanced.check.storage.hdr_version=版本号非法: %d
+chat.ae2enhanced.check.storage.hdr_read=读取失败: %s
+
+chat.ae2enhanced.check.channels.name=存储通道注册
+chat.ae2enhanced.check.channels.exception=通道检查执行异常: %s
+chat.ae2enhanced.check.channels.registered=已注册通道: %d 个 %s
+chat.ae2enhanced.check.channels.energy_missing=能量通道缺失(Flux Applied 不可用且 AE2E 通道未注册)
+chat.ae2enhanced.check.channels.mana_missing=Mana 通道缺失(Botania 已安装但通道未注册)
+chat.ae2enhanced.check.channels.mana_unexpected=Mana 通道已注册但 Botania 未安装
+chat.ae2enhanced.check.channels.starlight_missing=Starlight 通道缺失(Astral Sorcery 已安装但通道未注册)
+chat.ae2enhanced.check.channels.starlight_unexpected=Starlight 通道已注册但 Astral Sorcery 未安装
+chat.ae2enhanced.check.channels.gas_ok=气体通道已注册(mekeng)
+chat.ae2enhanced.check.channels.gas_missing=mekeng 已安装但气体通道未注册
+chat.ae2enhanced.check.channels.essentia_ok=源质通道已注册(thaumicenergistics)
+chat.ae2enhanced.check.channels.essentia_missing=thaumicenergistics 已安装但源质通道未注册
+
+chat.ae2enhanced.check.recipes.name=合成配方注册表
+chat.ae2enhanced.check.recipes.exception=配方检查执行异常: %s
+chat.ae2enhanced.check.recipes.blackhole_ok=黑洞配方: %d 条
+chat.ae2enhanced.check.recipes.blackhole_empty=黑洞配方注册表为空(可能被 CraftTweaker 全部移除)
+chat.ae2enhanced.check.recipes.ritual_ok=奇点仪式配方: %d 条
+chat.ae2enhanced.check.recipes.ritual_empty=奇点仪式配方注册表为空(可能被 CraftTweaker 全部移除)
+chat.ae2enhanced.check.recipes.chamber_ok=奇点处理仓配方: %d 条,byType=%s
+chat.ae2enhanced.check.recipes.chamber_empty=奇点处理仓配方索引为空
+
+chat.ae2enhanced.check.grid.name=AE2 网格
+chat.ae2enhanced.check.grid.exception=网格检查执行异常: %s
+chat.ae2enhanced.check.grid.summary=网格: %d 个,节点: %d 个,平均功耗: %s AE/t
+chat.ae2enhanced.check.grid.cpus=合成 CPU: %d 个(忙碌 %d 个)
+chat.ae2enhanced.check.grid.empty_grids=空网格: %d 个
+chat.ae2enhanced.check.grid.controller_conflicts=控制器冲突网格: %d 个
+chat.ae2enhanced.check.grid.unpowered=疑似断电网格(有功耗但储能为零): %d 个
+
+chat.ae2enhanced.check.personaldim.name=个人维度
+chat.ae2enhanced.check.personaldim.exception=个人维度检查执行异常: %s
+chat.ae2enhanced.check.personaldim.overworld_unavailable=主世界不可用,跳过个人维度检查
+chat.ae2enhanced.check.personaldim.orphan=玩家 %s 的维度 %d 未注册(孤儿条目)
+chat.ae2enhanced.check.personaldim.conflict=玩家 %s 的维度 %d 已被其他维度类型占用(ID 冲突)
+chat.ae2enhanced.check.personaldim.entries_summary=条目: %d 个(已分配维度 %d 个,未分配 %d 个)
+chat.ae2enhanced.check.personaldim.all_consistent=维度注册状态全部一致
+
+chat.ae2enhanced.perf.tps_header=[AE2E-Perf] 服务器 TPS/tick 耗时
+chat.ae2enhanced.perf.tps_header_off=[AE2E-Perf] 服务器 TPS/tick 耗时 (采集已关闭,以下为历史数据)
+chat.ae2enhanced.perf.tps_line=  %s: %s
+chat.ae2enhanced.perf.no_data=  %s: 暂无数据
+chat.ae2enhanced.perf.top_grid_header=[AE2E-Perf] 网格 tick 耗时 Top%d:
+chat.ae2enhanced.perf.grid_line=  #%d 节点=%d 耗时=%s 功耗=%sAE/t CPU=%d/%d (%s)
+chat.ae2enhanced.perf.no_grids=  (无网格)
+chat.ae2enhanced.perf.top_machine_header=[AE2E-Perf] 机器类 tick 耗时 Top%d (跨全部网格):
+chat.ae2enhanced.perf.machine_line=  #%d %s 节点=%d 总耗时=%s
+chat.ae2enhanced.perf.no_tracked=  (无被跟踪的 tick 节点)
+chat.ae2enhanced.perf.scan_ms=  扫描耗时: %sms
+chat.ae2enhanced.perf.invalid_rank=[AE2E-Perf] 无效的网格序号: %s (共 %d 个网格,序号即 /ae2e perf top grid 中的排名)
+chat.ae2enhanced.perf.grid_detail_header=[AE2E-Perf] 网格 #%d:
+chat.ae2enhanced.perf.grid_detail_nodes=  节点: %d  tick耗时: %s
+chat.ae2enhanced.perf.grid_detail_power=  控制器: %s  功耗: %s AE/t  储能: %s AE
+chat.ae2enhanced.perf.grid_detail_cpus=  合成 CPU: %d 忙碌 / %d 总数
+chat.ae2enhanced.perf.slow_header=[AE2E-Perf] 平均 tick 耗时 >= %sms 的节点 Top%d:
+chat.ae2enhanced.perf.slow_line=  #%d %s %s @ %s
+chat.ae2enhanced.perf.none_over=  (无超阈值节点)
+chat.ae2enhanced.perf.metrics_header=[AE2E-Perf] 指标快照:
+chat.ae2enhanced.perf.metrics_counter=  [counter] %s = %d
+chat.ae2enhanced.perf.metrics_timer=  [timer] %s %s
+chat.ae2enhanced.perf.metrics_gauge=  [gauge] %s = %s
+chat.ae2enhanced.perf.metrics_empty=  (无已注册指标)
+chat.ae2enhanced.perf.baseline_no_data=[AE2E-Perf] TPS 数据不足(服务器启动未满 1 分钟),稍后重试。
+chat.ae2enhanced.perf.baseline_set=[AE2E-Perf] 基准线已建立: tick平均=%sms 网格总耗时=%s 机器类=%d 个 预警倍数=%s
+chat.ae2enhanced.perf.baseline_save_failed=[AE2E-Perf] 基准线写入失败,详见服务端日志。
+chat.ae2enhanced.perf.baseline_none=[AE2E-Perf] 尚无基准线,使用 /ae2e perf baseline set 建立。
+chat.ae2enhanced.perf.baseline_show_header=[AE2E-Perf] 当前基准线:
+chat.ae2enhanced.perf.baseline_created=  建立时间: %s
+chat.ae2enhanced.perf.baseline_summary=  tick平均: %sms  网格总耗时: %s  预警倍数: %s
+chat.ae2enhanced.perf.baseline_machine=  %s: %s
+chat.ae2enhanced.perf.baseline_cleared=[AE2E-Perf] 基准线已清除,预警已停用。
+chat.ae2enhanced.perf.baseline_not_exist=[AE2E-Perf] 基准线不存在。
+chat.ae2enhanced.perf.export_failed=[AE2E-Perf] 导出失败,详见服务端日志。
+chat.ae2enhanced.perf.export_done=[AE2E-Perf] 已导出: %s
+chat.ae2enhanced.perf.alert_current=[AE2E-Perf] 当前预警倍数: %s
+chat.ae2enhanced.perf.alert_no_baseline=未建立基准线(预警停用)
+chat.ae2enhanced.perf.alert_need_baseline=[AE2E-Perf] 请先 /ae2e perf baseline set 建立基准线。
+chat.ae2enhanced.perf.alert_set=[AE2E-Perf] 预警倍数已设为 %s
+chat.ae2enhanced.perf.alert.header=[AE2E-Perf] 性能异常预警:
+chat.ae2enhanced.perf.alert.line=  %s
+chat.ae2enhanced.perf.alert.hint=  使用 /ae2e perf top / slow 定位来源,/ae2e perf baseline set 重建基准线
+chat.ae2enhanced.perf.alert.tick=平均 tick 耗时 %sms 超过基准 %sms 的 %s 倍
+chat.ae2enhanced.perf.alert.grid_total=网格总 tick 耗时 %s 超过基准 %s 的 %s 倍
+chat.ae2enhanced.perf.alert.machine=机器类 %s 耗时 %s 超过基准 %s 的 %s 倍
+
+chat.ae2enhanced.plan.stats_header=[AE2E-Plan] 计划路径统计(守恒校验: %s):
+chat.ae2enhanced.plan.stats_line=  %s: 次数=%d 计算耗时 avg=%sms max=%sms p95=%sms
+chat.ae2enhanced.plan.verify_summary=  守恒校验: 通过=%d 违反=%d 跳过(模拟计划)=%d
+chat.ae2enhanced.plan.running_header=[AE2E-Plan] 执行中的合成任务:
+chat.ae2enhanced.plan.unnamed_cpu=(未命名CPU)
+chat.ae2enhanced.plan.running_line=  %s 输出=%s 进度=%s(%d/%d) 协处理器=%d 已运行=%ss
+chat.ae2enhanced.plan.running_line_no_elapsed=  %s 输出=%s 进度=%s(%d/%d) 协处理器=%d
+chat.ae2enhanced.plan.running_none=  (无忙碌中的合成 CPU)

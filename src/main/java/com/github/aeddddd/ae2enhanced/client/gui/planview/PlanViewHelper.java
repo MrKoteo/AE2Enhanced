@@ -31,10 +31,19 @@ import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialPlanInfo;
  */
 public final class PlanViewHelper {
 
-    /** 标题栏截断宽度(像素), 为右上角搜索框留出空间. */
-    private static final int TITLE_MAX_WIDTH = 140;
-
     private PlanViewHelper() {
+    }
+
+    /** 列表统计(在视图重建时顺带计算, 供汇总统计行显示; 不受搜索过滤影响). */
+    public static final class ViewStats {
+        /** 有总量的物品种类数(三表并集). */
+        public int total;
+        /** 第一张表(storage)中数量 > 0 的种类数. */
+        public int first;
+        /** 第二张表(confirm: pending / cpu: active)中数量 > 0 的种类数. */
+        public int second;
+        /** 第三张表(confirm: missing / cpu: pending)中数量 > 0 的种类数. */
+        public int third;
     }
 
     // ==================== 模式存取(持久化到客户端配置) ====================
@@ -94,36 +103,48 @@ public final class PlanViewHelper {
 
     // ==================== 视图重建(过滤 + 排序) ====================
 
-    /** 合成确认界面: 从 storage/pending/missing 重建 visual 并排序. */
+    /** 合成确认界面: 从 storage/pending/missing 重建 visual 并排序, 顺带统计. */
     public static void refreshConfirm(List<IAEItemStack> visual, IItemList<IAEItemStack> storage,
             IItemList<IAEItemStack> pending, IItemList<IAEItemStack> missing,
-            String filter, PlanSortMode mode) {
-        collect(visual, storage, pending, missing, filter);
+            String filter, PlanSortMode mode, ViewStats stats) {
+        collect(visual, storage, pending, missing, filter, stats);
         visual.sort(confirmComparator(mode, visual, missing, pending));
     }
 
-    /** CPU 状态界面: 从 storage/active/pending 重建 visual 并排序. */
+    /** CPU 状态界面: 从 storage/active/pending 重建 visual 并排序, 顺带统计. */
     public static void refreshCpu(List<IAEItemStack> visual, IItemList<IAEItemStack> storage,
             IItemList<IAEItemStack> active, IItemList<IAEItemStack> pending,
-            String filter, PlanSortMode mode, CraftingDurationTracker durations) {
-        collect(visual, storage, active, pending, filter);
+            String filter, PlanSortMode mode, CraftingDurationTracker durations, ViewStats stats) {
+        collect(visual, storage, active, pending, filter, stats);
         visual.sort(cpuComparator(mode, active, pending, durations));
     }
 
     /** 三列表并集重建 visual: 总量 > 0 且匹配搜索过滤的项, 代表项 stackSize = 三表总量. */
     private static void collect(List<IAEItemStack> visual, IItemList<IAEItemStack> a,
-            IItemList<IAEItemStack> b, IItemList<IAEItemStack> c, String filter) {
+            IItemList<IAEItemStack> b, IItemList<IAEItemStack> c, String filter, ViewStats stats) {
         visual.clear();
         String f = filter == null ? "" : filter.trim().toLowerCase(Locale.ROOT);
         Set<String> seen = new HashSet<>();
-        collectFrom(visual, seen, a, a, b, c, f);
-        collectFrom(visual, seen, b, a, b, c, f);
-        collectFrom(visual, seen, c, a, b, c, f);
+        int[] counts = new int[3];
+        collectFrom(visual, seen, counts, 0, a, a, b, c, f);
+        collectFrom(visual, seen, counts, 1, b, a, b, c, f);
+        collectFrom(visual, seen, counts, 2, c, a, b, c, f);
+        if (stats != null) {
+            // seen 在过滤前加入, 统计不受搜索影响
+            stats.total = seen.size();
+            stats.first = counts[0];
+            stats.second = counts[1];
+            stats.third = counts[2];
+        }
     }
 
-    private static void collectFrom(List<IAEItemStack> visual, Set<String> seen, IItemList<IAEItemStack> list,
+    private static void collectFrom(List<IAEItemStack> visual, Set<String> seen, int[] counts, int listIdx,
+            IItemList<IAEItemStack> list,
             IItemList<IAEItemStack> a, IItemList<IAEItemStack> b, IItemList<IAEItemStack> c, String filter) {
         for (IAEItemStack s : list) {
+            if (s.getStackSize() > 0) {
+                counts[listIdx]++;
+            }
             long total = countOf(a, s) + countOf(b, s) + countOf(c, s);
             if (total <= 0) {
                 continue;
@@ -212,13 +233,13 @@ public final class PlanViewHelper {
 
     // ==================== 工具 ====================
 
-    /** 标题栏截断: 超出宽度时以 ... 结尾, 为右上角搜索框留位. */
-    public static String truncateTitle(String title) {
+    /** 标题栏截断: 超出宽度时以 ... 结尾, 为搜索框等控件留位. */
+    public static String truncateTitle(String title, int maxWidth) {
         FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
-        if (fr.getStringWidth(title) <= TITLE_MAX_WIDTH) {
+        if (fr.getStringWidth(title) <= maxWidth) {
             return title;
         }
-        return fr.trimStringToWidth(title, TITLE_MAX_WIDTH - fr.getStringWidth("...")) + "...";
+        return fr.trimStringToWidth(title, maxWidth - fr.getStringWidth("...")) + "...";
     }
 
     /** 物品身份键(注册名 + meta + NBT), 用于跨列表去重与计时跟踪. */

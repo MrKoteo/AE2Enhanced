@@ -4,7 +4,8 @@ import com.github.aeddddd.ae2enhanced.diag.DiagEvents;
 import com.github.aeddddd.ae2enhanced.diag.DiagSwitch;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 
 import java.util.ArrayList;
@@ -22,13 +23,15 @@ import java.util.Map;
  *   <li>基准线 Top10 机器类的当前耗时 vs 基准值</li>
  * </ul>
  *
- * <p>预警只提示不干预；冷却 5 分钟防刷屏。需先 {@code /ae2e perf baseline set} 建立基准线。</p>
+ * <p>预警只提示不干预；冷却 5 分钟防刷屏；消息为本地化键，客户端按各自语言渲染。
+ * 需先 {@code /ae2e perf baseline set} 建立基准线。</p>
  */
 public final class PerfAlerts {
 
     /** 比对间隔（1 分钟） */
     public static final int CHECK_INTERVAL_TICKS = 1200;
     private static final long ALERT_COOLDOWN_MS = 300_000L;
+    private static final String KEY_PREFIX = "chat.ae2enhanced.perf.alert.";
 
     private static long lastAlertMillis = 0L;
 
@@ -50,11 +53,11 @@ public final class PerfAlerts {
         }
         double mult = baseline.alertMultiplier;
 
-        List<String> alerts = new ArrayList<>();
+        List<ITextComponent> alerts = new ArrayList<>();
+        List<String> plainAlerts = new ArrayList<>();
         if (stats.avgMs > baseline.avgTickMs * mult) {
-            alerts.add(String.format(Locale.ROOT,
-                    "平均 tick 耗时 %.2fms 超过基准 %.2fms 的 %.1f 倍",
-                    stats.avgMs, baseline.avgTickMs, mult));
+            addAlert(alerts, plainAlerts, KEY_PREFIX + "tick",
+                    fmt(stats.avgMs), fmt(baseline.avgTickMs), fmt(mult));
         }
 
         PerfAnalyzer.ScanResult scan = PerfAnalyzer.scan(-1.0);
@@ -63,18 +66,16 @@ public final class PerfAlerts {
             gridTotal += gs.totalAvgNanos;
         }
         if (baseline.gridTotalNanos > 0 && gridTotal > baseline.gridTotalNanos * mult) {
-            alerts.add(String.format(Locale.ROOT,
-                    "网格总 tick 耗时 %s 超过基准 %s 的 %.1f 倍",
+            addAlert(alerts, plainAlerts, KEY_PREFIX + "grid_total",
                     PerfAnalyzer.formatNanos(gridTotal),
-                    PerfAnalyzer.formatNanos(baseline.gridTotalNanos), mult));
+                    PerfAnalyzer.formatNanos(baseline.gridTotalNanos), fmt(mult));
         }
         for (PerfAnalyzer.MachineStat ms : scan.machines) {
             Long base = baseline.machineTotals.get(ms.className);
             if (base != null && base > 0 && ms.totalAvgNanos > base * mult) {
-                alerts.add(String.format(Locale.ROOT,
-                        "机器类 %s 耗时 %s 超过基准 %s 的 %.1f 倍",
+                addAlert(alerts, plainAlerts, KEY_PREFIX + "machine",
                         ms.className, PerfAnalyzer.formatNanos(ms.totalAvgNanos),
-                        PerfAnalyzer.formatNanos(base), mult));
+                        PerfAnalyzer.formatNanos(base), fmt(mult));
             }
         }
 
@@ -86,23 +87,39 @@ public final class PerfAlerts {
             return;
         }
         lastAlertMillis = now;
-        for (String alert : alerts) {
+        for (String alert : plainAlerts) {
             DiagEvents.warn("perf", alert);
         }
         broadcastToOps(server, alerts);
     }
 
-    private static void broadcastToOps(MinecraftServer server, List<String> alerts) {
+    /** 同时产出本地化组件（玩家广播）与英文纯文本（事件流/日志）。 */
+    private static void addAlert(List<ITextComponent> alerts, List<String> plainAlerts,
+                                 String key, Object... args) {
+        TextComponentTranslation component = new TextComponentTranslation(key, args);
+        alerts.add(component);
+        plainAlerts.add(component.getUnformattedComponentText());
+    }
+
+    private static String fmt(double v) {
+        return String.format(Locale.ROOT, "%.2f", v);
+    }
+
+    private static void broadcastToOps(MinecraftServer server, List<ITextComponent> alerts) {
         for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
             if (!player.canUseCommand(2, "ae2enhanced")) {
                 continue;
             }
-            player.sendMessage(new TextComponentString(TextFormatting.RED + "[AE2E-Perf] 性能异常预警:"));
-            for (String alert : alerts) {
-                player.sendMessage(new TextComponentString(TextFormatting.YELLOW + "  " + alert));
+            ITextComponent header = new TextComponentTranslation(KEY_PREFIX + "header");
+            header.getStyle().setColor(TextFormatting.RED);
+            player.sendMessage(header);
+            for (ITextComponent alert : alerts) {
+                alert.getStyle().setColor(TextFormatting.YELLOW);
+                player.sendMessage(new TextComponentTranslation(KEY_PREFIX + "line", alert));
             }
-            player.sendMessage(new TextComponentString(TextFormatting.GRAY
-                    + "  使用 /ae2e perf top / slow 定位来源,/ae2e perf baseline set 重建基准线"));
+            ITextComponent hint = new TextComponentTranslation(KEY_PREFIX + "hint");
+            hint.getStyle().setColor(TextFormatting.GRAY);
+            player.sendMessage(hint);
         }
     }
 }

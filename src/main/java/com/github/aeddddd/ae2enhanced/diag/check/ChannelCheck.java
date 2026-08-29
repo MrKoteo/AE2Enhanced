@@ -26,6 +26,8 @@ import java.util.List;
  */
 public final class ChannelCheck implements SystemCheck {
 
+    private static final String KEY_PREFIX = "chat.ae2enhanced.check.channels.";
+
     @Override
     public String name() {
         return "channels";
@@ -33,7 +35,7 @@ public final class ChannelCheck implements SystemCheck {
 
     @Override
     public String displayName() {
-        return "存储通道注册";
+        return KEY_PREFIX + "name";
     }
 
     @Override
@@ -57,40 +59,40 @@ public final class ChannelCheck implements SystemCheck {
                 if (lower.contains("gas")) hasGas = true;
                 if (lower.contains("essentia")) hasEssentia = true;
             }
-            out.add(CheckResult.ok("已注册通道: " + channels.size() + " 个 " + names));
+            out.add(CheckResult.ok(KEY_PREFIX + "registered", channels.size(), names));
 
             // 能量通道：无条件必须存在
             if (!hasEnergy) {
-                out.add(CheckResult.error("能量通道缺失(Flux Applied 不可用且 AE2E 通道未注册)"));
+                out.add(CheckResult.error(KEY_PREFIX + "energy_missing"));
             }
             // Mana 通道：按注册条件核对
             boolean manaExpected = BotaniaApplieCompat.isManaStorageChannelAvailable()
                     || Loader.isModLoaded("botania");
             if (manaExpected && !hasMana) {
-                out.add(CheckResult.error("Mana 通道缺失(Botania 已安装但通道未注册)"));
+                out.add(CheckResult.error(KEY_PREFIX + "mana_missing"));
             } else if (!manaExpected && hasMana) {
-                out.add(CheckResult.warn("Mana 通道已注册但 Botania 未安装"));
+                out.add(CheckResult.warn(KEY_PREFIX + "mana_unexpected"));
             }
             // Starlight 通道：按注册条件核对
             boolean starlightExpected = Loader.isModLoaded("astralsorcery");
             if (starlightExpected && !hasStarlight) {
-                out.add(CheckResult.error("Starlight 通道缺失(Astral Sorcery 已安装但通道未注册)"));
+                out.add(CheckResult.error(KEY_PREFIX + "starlight_missing"));
             } else if (!starlightExpected && hasStarlight) {
-                out.add(CheckResult.warn("Starlight 通道已注册但 Astral Sorcery 未安装"));
+                out.add(CheckResult.warn(KEY_PREFIX + "starlight_unexpected"));
             }
             // 气体/源质通道：外部提供,仅报告
             if (Loader.isModLoaded("mekeng")) {
                 out.add(hasGas
-                        ? CheckResult.ok("气体通道已注册(mekeng)")
-                        : CheckResult.error("mekeng 已安装但气体通道未注册"));
+                        ? CheckResult.ok(KEY_PREFIX + "gas_ok")
+                        : CheckResult.error(KEY_PREFIX + "gas_missing"));
             }
             if (Loader.isModLoaded("thaumicenergistics")) {
                 out.add(hasEssentia
-                        ? CheckResult.ok("源质通道已注册(thaumicenergistics)")
-                        : CheckResult.error("thaumicenergistics 已安装但源质通道未注册"));
+                        ? CheckResult.ok(KEY_PREFIX + "essentia_ok")
+                        : CheckResult.error(KEY_PREFIX + "essentia_missing"));
             }
         } catch (Exception e) {
-            out.add(CheckResult.error("通道检查执行异常: " + e));
+            out.add(CheckResult.error(KEY_PREFIX + "exception", String.valueOf(e)));
         }
     }
 }

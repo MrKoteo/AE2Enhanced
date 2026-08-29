@@ -63,6 +63,7 @@
     "terminal.MixinAEBaseGuiPlanHooks",
     "terminal.MixinGuiCraftConfirm",
     "terminal.MixinGuiCraftingCPU",
+    "terminal.MixinGuiCraftingStatus",
     "terminal.MixinGuiMEMonitorableClick",
     "terminal.MixinGuiMEMonitorableTooltip",
     "terminal.MixinGuiMEMonitorable",

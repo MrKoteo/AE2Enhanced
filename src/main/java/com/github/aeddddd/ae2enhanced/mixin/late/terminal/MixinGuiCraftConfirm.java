@@ -64,6 +64,9 @@ public abstract class MixinGuiCraftConfirm implements IPlanViewHost {
     @Unique
     private String ae2enhanced$searchText = "";
 
+    @Unique
+    private final PlanViewHelper.ViewStats ae2enhanced$stats = new PlanViewHelper.ViewStats();
+
     // ==================== 列表重建(排序 + 搜索过滤) ====================
 
     @Inject(method = "postUpdate", at = @At("TAIL"))
@@ -74,7 +77,7 @@ public abstract class MixinGuiCraftConfirm implements IPlanViewHost {
     @Unique
     private void ae2enhanced$refreshView() {
         PlanViewHelper.refreshConfirm(this.visual, this.storage, this.pending, this.missing,
-                this.ae2enhanced$searchText, PlanViewHelper.confirmMode());
+                this.ae2enhanced$searchText, PlanViewHelper.confirmMode(), this.ae2enhanced$stats);
         // 原生 setScrollBar 已在重建前执行, 用过滤后的尺寸重设范围(5 行视图)
         ((MixinAEBaseGuiAccessor) this).ae2enhanced$getMyScrollBar()
                 .setRange(0, (this.visual.size() + 2) / 3 - 5, 1);
@@ -199,7 +202,31 @@ public abstract class MixinGuiCraftConfirm implements IPlanViewHost {
     )
     private int ae2enhanced$truncateTitle(FontRenderer fr, String title, int x, int y, int color,
             Operation<Integer> original) {
-        return original.call(fr, PlanViewHelper.truncateTitle(title), x, y, color);
+        return original.call(fr, PlanViewHelper.truncateTitle(title, 140), x, y, color);
+    }
+
+    // ==================== 汇总统计块(左侧纹理外区域) ====================
+
+    @Inject(method = "drawFG", at = @At("TAIL"), require = 0)
+    private void ae2enhanced$drawSummary(int offsetX, int offsetY, int mouseX, int mouseY,
+            CallbackInfo ci) {
+        try {
+            if (this.ae2enhanced$stats.total <= 0) {
+                return;
+            }
+            FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
+            // 纹理外区域背景较暗, 用亮色文字; 缺料 > 0 时红色醒目
+            fr.drawString(I18n.format("gui.ae2enhanced.plan_summary.total", this.ae2enhanced$stats.total),
+                    -78, 19, 0xAAAAAA);
+            fr.drawString(I18n.format("gui.ae2enhanced.plan_summary.stored", this.ae2enhanced$stats.first),
+                    -78, 29, 0xAAAAAA);
+            fr.drawString(I18n.format("gui.ae2enhanced.plan_summary.to_craft", this.ae2enhanced$stats.second),
+                    -78, 39, 0xAAAAAA);
+            fr.drawString(I18n.format("gui.ae2enhanced.plan_summary.missing", this.ae2enhanced$stats.third),
+                    -78, 49, this.ae2enhanced$stats.third > 0 ? 0xFF5555 : 0xAAAAAA);
+        } catch (Throwable ignored) {
+            // 渲染增强失败静默
+        }
     }
 
     // ==================== Special Plan Tooltip ====================

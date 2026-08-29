@@ -19,7 +19,7 @@ public interface SystemCheck {
     /** 命令行标识（小写），如 "storage"。 */
     String name();
 
-    /** 报告中的显示名。 */
+    /** 报告中的显示名（本地化键，如 chat.ae2enhanced.check.storage.name）。 */
     String displayName();
 
     void run(MinecraftServer server, List<CheckResult> out);

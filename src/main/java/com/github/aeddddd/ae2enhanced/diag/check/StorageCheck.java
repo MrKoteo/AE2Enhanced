@@ -3,6 +3,7 @@ package com.github.aeddddd.ae2enhanced.diag.check;
 import com.github.aeddddd.ae2enhanced.tile.TileHyperdimensionalController;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 
 import java.io.DataInputStream;
@@ -30,6 +31,8 @@ public final class StorageCheck implements SystemCheck {
     private static final int HEADER_CURRENT_VERSION = 1;
     private static final int HEADER_BYTES = 16;
 
+    private static final String KEY_PREFIX = "chat.ae2enhanced.check.storage.";
+
     @Override
     public String name() {
         return "storage";
@@ -37,7 +40,7 @@ public final class StorageCheck implements SystemCheck {
 
     @Override
     public String displayName() {
-        return "超维度仓储中枢";
+        return KEY_PREFIX + "name";
     }
 
     @Override
@@ -46,7 +49,7 @@ public final class StorageCheck implements SystemCheck {
             Set<UUID> loadedNexusIds = checkLoadedControllers(server, out);
             checkDiskStorage(server, loadedNexusIds, out);
         } catch (Exception e) {
-            out.add(CheckResult.error("仓储检查执行异常: " + e));
+            out.add(CheckResult.error(KEY_PREFIX + "exception", String.valueOf(e)));
         }
     }
 
@@ -68,34 +71,34 @@ public final class StorageCheck implements SystemCheck {
                 }
                 String where = te.getPos() + " @dim" + world.provider.getDimension();
                 if (!controller.isFormed()) {
-                    out.add(CheckResult.error("控制器未成型: " + where));
+                    out.add(CheckResult.error(KEY_PREFIX + "controller_unformed", where));
                     continue;
                 }
                 formed++;
                 if (controller.isSafeMode()) {
-                    out.add(CheckResult.error("控制器处于安全模式(存储分区损坏): " + where));
+                    out.add(CheckResult.error(KEY_PREFIX + "controller_safe_mode", where));
                 }
                 if (!controller.isNetworkActive()) {
-                    out.add(CheckResult.warn("控制器网络未激活: " + where));
+                    out.add(CheckResult.warn(KEY_PREFIX + "controller_inactive", where));
                 }
                 if (!controller.isNetworkPowered()) {
-                    out.add(CheckResult.warn("控制器网络供电不足: " + where));
+                    out.add(CheckResult.warn(KEY_PREFIX + "controller_unpowered", where));
                 }
             }
         }
-        out.add(CheckResult.ok("已加载控制器: " + total + " 个(成型 " + formed + " 个)"));
+        out.add(CheckResult.ok(KEY_PREFIX + "controllers_summary", total, formed));
         return nexusIds;
     }
 
     private void checkDiskStorage(MinecraftServer server, Set<UUID> loadedNexusIds, List<CheckResult> out) {
         WorldServer overworld = server.getWorld(0);
         if (overworld == null) {
-            out.add(CheckResult.warn("主世界不可用,跳过磁盘存档检查"));
+            out.add(CheckResult.warn(KEY_PREFIX + "overworld_unavailable"));
             return;
         }
         File storageDir = new File(overworld.getSaveHandler().getWorldDirectory(), "ae2enhanced/storage");
         if (!storageDir.exists()) {
-            out.add(CheckResult.ok("磁盘存档目录不存在(尚无仓储数据)"));
+            out.add(CheckResult.ok(KEY_PREFIX + "no_save_dir"));
             return;
         }
         File[] entries = storageDir.listFiles((dir, name) -> {
@@ -104,7 +107,7 @@ public final class StorageCheck implements SystemCheck {
             return f.isDirectory() || name.endsWith(".dat");
         });
         if (entries == null || entries.length == 0) {
-            out.add(CheckResult.ok("磁盘存档目录为空"));
+            out.add(CheckResult.ok(KEY_PREFIX + "empty_save_dir"));
             return;
         }
         int healthy = 0;
@@ -113,9 +116,9 @@ public final class StorageCheck implements SystemCheck {
             String id = entry.isDirectory()
                     ? entry.getName()
                     : entry.getName().substring(0, entry.getName().length() - 4);
-            String headerError = validateHeader(entry);
+            TextComponentTranslation headerError = validateHeader(entry);
             if (headerError != null) {
-                out.add(CheckResult.error("存档 " + id + " 文件头损坏: " + headerError));
+                out.add(CheckResult.error(KEY_PREFIX + "header_corrupt", id, headerError));
                 continue;
             }
             healthy++;
@@ -123,19 +126,18 @@ public final class StorageCheck implements SystemCheck {
             try {
                 loaded = loadedNexusIds.contains(UUID.fromString(id));
             } catch (IllegalArgumentException e) {
-                out.add(CheckResult.warn("存档 " + id + " 不是合法 UUID 命名"));
+                out.add(CheckResult.warn(KEY_PREFIX + "bad_uuid_name", id));
                 continue;
             }
             if (!loaded) {
                 unloaded++;
             }
         }
-        out.add(CheckResult.ok("磁盘存档: " + entries.length + " 个(健康 " + healthy
-                + " 个,当前未加载 " + unloaded + " 个)"));
+        out.add(CheckResult.ok(KEY_PREFIX + "saves_summary", entries.length, healthy, unloaded));
     }
 
-    /** 校验分区文件头；合法返回 null，否则返回错误描述。 */
-    private static String validateHeader(File entry) {
+    /** 校验分区文件头；合法返回 null，否则返回错误描述（本地化组件，作为参数嵌套渲染）。 */
+    private static TextComponentTranslation validateHeader(File entry) {
         File target;
         if (entry.isDirectory()) {
             target = new File(entry, "items.bin");
@@ -146,20 +148,21 @@ public final class StorageCheck implements SystemCheck {
             target = entry; // 旧格式 <uuid>.dat
         }
         if (target.length() < HEADER_BYTES) {
-            return "文件长度不足 " + HEADER_BYTES + " 字节";
+            return new TextComponentTranslation(KEY_PREFIX + "hdr_short", HEADER_BYTES);
         }
         try (DataInputStream in = new DataInputStream(new FileInputStream(target))) {
             int magic = in.readInt();
             if (magic != HEADER_MAGIC) {
-                return "Magic 不匹配(0x" + Integer.toHexString(magic) + ")";
+                return new TextComponentTranslation(KEY_PREFIX + "hdr_magic",
+                        "0x" + Integer.toHexString(magic));
             }
             int version = in.readInt();
             if (version < 0 || version > HEADER_CURRENT_VERSION) {
-                return "版本号非法: " + version;
+                return new TextComponentTranslation(KEY_PREFIX + "hdr_version", version);
             }
             return null;
         } catch (Exception e) {
-            return "读取失败: " + e;
+            return new TextComponentTranslation(KEY_PREFIX + "hdr_read", String.valueOf(e));
         }
     }
 }

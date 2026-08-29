@@ -98,7 +98,9 @@ public final class DiagReport {
         int totalWarn = 0;
         int totalError = 0;
         for (Map.Entry<SystemCheck, List<CheckResult>> entry : results.entrySet()) {
-            w.println("### " + entry.getKey().displayName() + " (" + entry.getKey().name() + ")");
+            w.println("### " + new net.minecraft.util.text.TextComponentTranslation(
+                    entry.getKey().displayName()).getUnformattedComponentText()
+                    + " (" + entry.getKey().name() + ")");
             for (CheckResult r : entry.getValue()) {
                 w.println("  " + r);
                 switch (r.level) {

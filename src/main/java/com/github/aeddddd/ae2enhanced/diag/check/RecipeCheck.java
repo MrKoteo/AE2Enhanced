@@ -15,6 +15,8 @@ import java.util.TreeMap;
  */
 public final class RecipeCheck implements SystemCheck {
 
+    private static final String KEY_PREFIX = "chat.ae2enhanced.check.recipes.";
+
     @Override
     public String name() {
         return "recipes";
@@ -22,7 +24,7 @@ public final class RecipeCheck implements SystemCheck {
 
     @Override
     public String displayName() {
-        return "合成配方注册表";
+        return KEY_PREFIX + "name";
     }
 
     @Override
@@ -30,13 +32,13 @@ public final class RecipeCheck implements SystemCheck {
         try {
             int blackHole = BlackHoleRecipeRegistry.getRecipes().size();
             out.add(blackHole > 0
-                    ? CheckResult.ok("黑洞配方: " + blackHole + " 条")
-                    : CheckResult.warn("黑洞配方注册表为空(可能被 CraftTweaker 全部移除)"));
+                    ? CheckResult.ok(KEY_PREFIX + "blackhole_ok", blackHole)
+                    : CheckResult.warn(KEY_PREFIX + "blackhole_empty"));
 
             int singularity = SingularityRecipeRegistry.getRecipes().size();
             out.add(singularity > 0
-                    ? CheckResult.ok("奇点仪式配方: " + singularity + " 条")
-                    : CheckResult.warn("奇点仪式配方注册表为空(可能被 CraftTweaker 全部移除)"));
+                    ? CheckResult.ok(KEY_PREFIX + "ritual_ok", singularity)
+                    : CheckResult.warn(KEY_PREFIX + "ritual_empty"));
 
             List<ChamberRecipe> chamber = ChamberRecipeIndex.allRecipes();
             Map<String, Integer> byType = new TreeMap<>();
@@ -46,10 +48,10 @@ public final class RecipeCheck implements SystemCheck {
                 byType.merge(prefix, 1, Integer::sum);
             }
             out.add(chamber.isEmpty()
-                    ? CheckResult.error("奇点处理仓配方索引为空")
-                    : CheckResult.ok("奇点处理仓配方: " + chamber.size() + " 条,byType=" + byType));
+                    ? CheckResult.error(KEY_PREFIX + "chamber_empty")
+                    : CheckResult.ok(KEY_PREFIX + "chamber_ok", chamber.size(), byType));
         } catch (Exception e) {
-            out.add(CheckResult.error("配方检查执行异常: " + e));
+            out.add(CheckResult.error(KEY_PREFIX + "exception", String.valueOf(e)));
         }
     }
 }
