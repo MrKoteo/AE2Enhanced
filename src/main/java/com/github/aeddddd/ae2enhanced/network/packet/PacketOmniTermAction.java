@@ -1,5 +1,6 @@
 package com.github.aeddddd.ae2enhanced.network.packet;
 
+import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.container.ContainerOmniTerm;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -87,7 +88,7 @@ public class PacketOmniTermAction implements IMessage {
                             int offset = Integer.parseInt(message.value);
                             c.setRCSlot(offset);
                         } catch (NumberFormatException e) {
-                            e.printStackTrace();
+                            AE2Enhanced.LOGGER.error("处理 Scroll 动作时数值解析失败: {}", message.value, e);
                         }
                         break;
                 }

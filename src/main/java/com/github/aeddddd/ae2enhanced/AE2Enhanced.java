@@ -88,6 +88,8 @@ public class AE2Enhanced {
         ModRecipes.init();
         ModEventHandler.register();
         MinecraftForge.EVENT_BUS.register(new WirelessChannelTickHandler());
+        // 服务器 TPS/tick 耗时采集（/ae2e perf tps,总开关 /ae2e debug perf off）
+        MinecraftForge.EVENT_BUS.register(new com.github.aeddddd.ae2enhanced.diag.perf.TpsTracker());
     }
 
     @Mod.EventHandler

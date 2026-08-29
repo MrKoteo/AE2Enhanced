@@ -33,6 +33,9 @@ public class FallbackDagCraftingJob extends DagCraftingJob {
 
     @Override
     public void run() {
+        long planStart = System.nanoTime();
+        // 标记是否经 super.run() 回落原生——该路径已由 MixinCraftingJob 的 run RETURN 钩子计数,避免重复
+        boolean delegatedToNative = false;
         IActionSource src = Ae2CraftingReflect.getActionSrc(this);
         try {
             TickHandler.INSTANCE.registerCraftingSimulation(this.world, this);
@@ -102,8 +105,14 @@ public class FallbackDagCraftingJob extends DagCraftingJob {
                     .warn("DAG FALLBACK 异常,回落原生计算: {}", t.toString());
             Ae2CraftingReflect.setAvailableCheck(this, null);
             NativeCalcBudget.arm(this);
+            delegatedToNative = true;
             super.run();
             NativeCalcBudget.warnIfAborted(this);
+        } finally {
+            if (!delegatedToNative) {
+                com.github.aeddddd.ae2enhanced.diag.plan.PlanTracker.onJobComputed(this,
+                        System.nanoTime() - planStart);
+            }
         }
     }
 }

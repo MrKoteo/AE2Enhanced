@@ -6,6 +6,7 @@ import appeng.core.sync.network.NetworkHandler;
 import appeng.core.sync.packets.PacketInventoryAction;
 import appeng.helpers.InventoryAction;
 import appeng.util.item.AEItemStack;
+import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.util.fakeitem.FakeEssentiaSafe;
 import com.github.aeddddd.ae2enhanced.util.fakeitem.FakeFluids;
 import mezz.jei.api.gui.IGhostIngredientHandler;
@@ -54,7 +55,7 @@ public class GhostIngredientTarget implements IGhostIngredientHandler.Target<Obj
             );
             NetworkHandler.instance().sendToServer(p);
         } catch (IOException e) {
-            e.printStackTrace();
+            AE2Enhanced.LOGGER.error("发送 JEI ghost 物品到服务端失败", e);
         }
     }
 

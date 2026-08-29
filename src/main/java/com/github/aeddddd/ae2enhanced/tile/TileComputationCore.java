@@ -317,9 +317,6 @@ public class TileComputationCore extends TileAENetworkBase implements IActionHos
 
     // ---------- 集群创建 ----------
 
-    private static final boolean CRAZYAE_LOADED =
-        net.minecraftforge.fml.common.Loader.isModLoaded("crazyae");
-
     private CraftingCPUCluster createCluster() {
         CraftingCPUCluster cluster = new CraftingCPUCluster(
             new WorldCoord(pos.getX(), pos.getY(), pos.getZ()),
@@ -343,27 +340,6 @@ public class TileComputationCore extends TileAENetworkBase implements IActionHos
 
             // 设置 Mixin 字段,标记该集群属于本计算核心
             ((IComputationCoreAccess) (Object) cluster).ae2enhanced$setComputationCore(this);
-
-            // CrazyAE 兼容：初始化任何未初始化的集合字段(CrazyAE 通过 ASM 添加的字段
-            // 可能未在构造函数中初始化,虚拟集群会导致 NPE)
-            if (CRAZYAE_LOADED) {
-                for (Field f : CraftingCPUCluster.class.getDeclaredFields()) {
-                    f.setAccessible(true);
-                    try {
-                        if (f.get(cluster) == null) {
-                            Class<?> type = f.getType();
-                            if (java.util.List.class.isAssignableFrom(type)) {
-                                f.set(cluster, new java.util.ArrayList<>());
-                            } else if (java.util.Map.class.isAssignableFrom(type)) {
-                                f.set(cluster, new java.util.HashMap<>());
-                            } else if (java.util.Set.class.isAssignableFrom(type)) {
-                                f.set(cluster, new java.util.HashSet<>());
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
-            }
 
         } catch (Exception e) {
             AE2Enhanced.LOGGER.error("[AE2E] Failed to setup CraftingCPUCluster for Computation Core", e);

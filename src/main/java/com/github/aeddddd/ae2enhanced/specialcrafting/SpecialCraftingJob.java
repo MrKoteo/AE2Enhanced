@@ -27,6 +27,7 @@ import appeng.crafting.MECraftingInventory;
 import appeng.hooks.TickHandler;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.diag.plan.PlanTracker;
 import com.github.aeddddd.ae2enhanced.network.packet.PacketSpecialPlanInfo;
 
 /**
@@ -78,17 +79,27 @@ public class SpecialCraftingJob extends CraftingJob
 
     @Override
     public void run() {
+        long planStart = System.nanoTime();
         boolean handled = false;
+        // 标记是否经 super.run() 回落原生——该路径已由 MixinCraftingJob 的 run RETURN 钩子计数,避免重复
+        boolean delegatedToNative = false;
         try {
-            handled = this.trySpecialRun();
-        } catch (Throwable t) {
-            AE2Enhanced.LOGGER.warn("[特殊配方] 求解异常,回落原生计算: {}", t.toString());
-        }
-        if (!handled) {
-            // 回落原生:挂计算预算(病态计划的原生递归可能永不结束,见 NativeCalcBudget)
-            NativeCalcBudget.arm(this);
-            super.run();
-            NativeCalcBudget.warnIfAborted(this);
+            try {
+                handled = this.trySpecialRun();
+            } catch (Throwable t) {
+                AE2Enhanced.LOGGER.warn("[特殊配方] 求解异常,回落原生计算: {}", t.toString());
+            }
+            if (!handled) {
+                // 回落原生:挂计算预算(病态计划的原生递归可能永不结束,见 NativeCalcBudget)
+                NativeCalcBudget.arm(this);
+                delegatedToNative = true;
+                super.run();
+                NativeCalcBudget.warnIfAborted(this);
+            }
+        } finally {
+            if (!delegatedToNative) {
+                PlanTracker.onJobComputed(this, System.nanoTime() - planStart);
+            }
         }
     }
 

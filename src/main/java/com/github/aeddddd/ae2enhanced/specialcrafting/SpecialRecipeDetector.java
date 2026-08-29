@@ -11,6 +11,8 @@ import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.storage.data.IAEItemStack;
 
 import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
+import com.github.aeddddd.ae2enhanced.diag.DiagEvents;
+import com.github.aeddddd.ae2enhanced.diag.metrics.MetricsRegistry;
 
 /**
  * 特殊配方预扫描（路由点 A 的判定逻辑,移植自 1.20.1）.
@@ -68,6 +70,9 @@ public final class SpecialRecipeDetector {
             if (budget.expired()) {
                 SpecialLog.info("[特殊配方] detector 分析超预算(>{}ms),保守漏判: {}",
                         AE2EnhancedConfig.crafting.specialDetectorBudgetMs, what);
+                MetricsRegistry.counter("crafting.detectorBudgetExceeded").increment();
+                DiagEvents.warn("crafting", "detector 分析超预算(>"
+                        + AE2EnhancedConfig.crafting.specialDetectorBudgetMs + "ms),保守漏判: " + what);
                 return false;
             }
             CycleAnalyzer.Analysis analysis = CycleAnalyzer.analyzeMemo(index, cycle);

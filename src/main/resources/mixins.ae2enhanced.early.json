@@ -18,7 +18,9 @@
     "accessor.IEntityLivingBaseAccessor"
   ],
   "client": [
-    "world.MixinPlayerControllerMP"
+    "world.MixinPlayerControllerMP",
+    "terminal.MixinGuiScreenPlanHooks",
+    "accessor.IGuiScreenAccessor"
   ],
   "server": []
 }

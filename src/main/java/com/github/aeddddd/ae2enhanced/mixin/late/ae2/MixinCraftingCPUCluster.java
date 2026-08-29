@@ -26,10 +26,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinCraftingCPUCluster implements IComputationCoreAccess {
 
     @Unique
-    private static final boolean CRAZYAE_LOADED =
-        net.minecraftforge.fml.common.Loader.isModLoaded("crazyae");
-
-    @Unique
     private TileComputationCore ae2enhanced$computationCore;
 
     @Override
@@ -130,11 +126,8 @@ public class MixinCraftingCPUCluster implements IComputationCoreAccess {
     )
     private boolean redirectIsActive(TileCraftingTile instance) {
         if (ae2enhanced$computationCore != null) {
-            // CrazyAE 兼容：保留默认行为,避免干扰其修改后的 isActive 逻辑.
-            if (!CRAZYAE_LOADED) {
-                IGridNode node = ae2enhanced$computationCore.getActionableNode();
-                return node != null && node.isActive();
-            }
+            IGridNode node = ae2enhanced$computationCore.getActionableNode();
+            return node != null && node.isActive();
         }
         // 防御：某些情况下 getCore() 可能返回 null(如集群尚未完全初始化),
         // 此时应视为 inactive,避免 NPE.

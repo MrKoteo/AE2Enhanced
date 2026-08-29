@@ -7,7 +7,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.world.World;
-import net.minecraftforge.fml.common.Loader;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -41,9 +40,6 @@ import java.util.Map;
 @Mixin(value = CraftingCPUCluster.class, remap = false)
 public abstract class MixinCraftingCPUClusterPushCooldown {
 
-    @Unique
-    private static final boolean AE2E_CRAZYAE_LOADED = Loader.isModLoaded("crazyae");
-
     /** 推送失败冷却时长（tick），对齐 TickRates.Interface 的最小 tick 间隔。 */
     @Unique
     private static final long AE2E_PUSH_FAIL_COOLDOWN_TICKS = 5L;
@@ -65,13 +61,11 @@ public abstract class MixinCraftingCPUClusterPushCooldown {
             target = "Lappeng/api/networking/crafting/ICraftingMedium;isBusy()Z"),
             require = 0)
     private boolean ae2e$treatCooledMediumAsBusy(ICraftingMedium medium, Operation<Boolean> original) {
-        if (!AE2E_CRAZYAE_LOADED) {
-            Long failTick = this.ae2e$pushFailTicks.get(medium);
-            if (failTick != null) {
-                World world = this.getWorld();
-                if (world != null && world.getTotalWorldTime() - failTick < AE2E_PUSH_FAIL_COOLDOWN_TICKS) {
-                    return true;
-                }
+        Long failTick = this.ae2e$pushFailTicks.get(medium);
+        if (failTick != null) {
+            World world = this.getWorld();
+            if (world != null && world.getTotalWorldTime() - failTick < AE2E_PUSH_FAIL_COOLDOWN_TICKS) {
+                return true;
             }
         }
         return original.call(medium);
@@ -85,7 +79,7 @@ public abstract class MixinCraftingCPUClusterPushCooldown {
     private boolean ae2e$recordPushFailure(ICraftingMedium medium, ICraftingPatternDetails details,
             InventoryCrafting table, Operation<Boolean> original) {
         boolean result = original.call(medium, details, table);
-        if (!result && !AE2E_CRAZYAE_LOADED) {
+        if (!result) {
             World world = this.getWorld();
             if (world != null) {
                 this.ae2e$pushFailTicks.put(medium, world.getTotalWorldTime());

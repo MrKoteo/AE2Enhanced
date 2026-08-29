@@ -196,7 +196,7 @@ public class GuiOmniTerm extends GuiMEMonitorable implements IJEIGhostIngredient
             acc.ae2e$setSearchField(newField);
             this.omniSearchField = newField;
         } catch (Exception e) {
-            e.printStackTrace();
+            AE2Enhanced.LOGGER.error("替换搜索框失败", e);
         }
 
         // 6. 设置物品库滚动条
@@ -220,7 +220,7 @@ public class GuiOmniTerm extends GuiMEMonitorable implements IJEIGhostIngredient
         try {
             ((IGuiMEMonitorableAccessor) this).ae2e$setCraftingStatusBtn(craftingStatusBtn);
         } catch (Exception e) {
-            e.printStackTrace();
+            AE2Enhanced.LOGGER.error("设置合成状态按钮失败", e);
         }
 
         // 8. 添加编码区按钮
@@ -365,7 +365,7 @@ public class GuiOmniTerm extends GuiMEMonitorable implements IJEIGhostIngredient
             // 让 AE2 标准按钮(SortDir/ViewMode/TerminalStyle 等)也能正常工作
             super.actionPerformed(btn);
         } catch (Exception e) {
-            e.printStackTrace();
+            AE2Enhanced.LOGGER.error("处理按钮动作失败: {}", btn, e);
         }
     }
 

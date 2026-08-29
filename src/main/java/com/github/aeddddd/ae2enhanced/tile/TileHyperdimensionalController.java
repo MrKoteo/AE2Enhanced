@@ -10,6 +10,9 @@ import appeng.me.helpers.MachineSource;
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.registry.content.BlockRegistry;
 import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
+import com.github.aeddddd.ae2enhanced.diag.DiagSwitch;
+import com.github.aeddddd.ae2enhanced.diag.metrics.MetricsRegistry;
+import com.github.aeddddd.ae2enhanced.diag.metrics.Timer;
 import com.github.aeddddd.ae2enhanced.block.BlockHyperdimensionalController;
 import com.github.aeddddd.ae2enhanced.integration.botaniaapplie.BotaniaApplieCompat;
 import com.github.aeddddd.ae2enhanced.integration.fluxapplied.FluxAppliedCompat;
@@ -624,6 +627,18 @@ public class TileHyperdimensionalController extends TileAENetworkBase implements
             return;
         }
 
+        // 性能埋点：采样率 1/20,总开关 /ae2e debug perf off
+        Timer perfTimer = null;
+        long perfStart = 0L;
+        if (DiagSwitch.isEnabled(DiagSwitch.PERF)) {
+            perfTimer = MetricsRegistry.timer("storage.hdc.update");
+            if (perfTimer.shouldSample()) {
+                perfStart = System.nanoTime();
+            } else {
+                perfTimer = null;
+            }
+        }
+
         if (needsReady && formed) {
             needsReady = false;
             initStorage();
@@ -720,6 +735,10 @@ public class TileHyperdimensionalController extends TileAENetworkBase implements
                 markDirty();
                 world.notifyBlockUpdate(pos, world.getBlockState(pos), world.getBlockState(pos), 2);
             }
+        }
+
+        if (perfTimer != null) {
+            perfTimer.record(System.nanoTime() - perfStart);
         }
     }
 

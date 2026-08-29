@@ -66,12 +66,11 @@ public class AE2EnhancedConfig {
     })
     public static ChannelPathing channelPathing = new ChannelPathing();
 
-    @Config.Name("Debug")
+    @Config.Name("Diagnostics")
     @Config.Comment({
-        "Debug/diagnostic settings.",
-        "Default: all off."
+        "Diagnostics & performance analysis tool settings."
     })
-    public static Debug debug = new Debug();
+    public static Diagnostics diagnostics = new Diagnostics();
 
     @Config.Name("Guide")
     @Config.Comment({
@@ -104,6 +103,16 @@ public class AE2EnhancedConfig {
         public int renderDistance = 128;
     }
 
+    public static class Diagnostics {
+
+        @Config.Comment({
+            "Permission level required for /ae2e perf and /ae2e plan.",
+            "0 = everyone, 2 = OP only. Default: 0"
+        })
+        @Config.RangeInt(min = 0, max = 4)
+        public int analysisPermissionLevel = 0;
+    }
+
     public static class Guide {
 
         @Config.Comment({
@@ -121,21 +130,19 @@ public class AE2EnhancedConfig {
         public String theme = "vscode-dark";
     }
 
-    public static class Debug {
-
-        @Config.Comment({
-            "Enable verbose diagnostic logging for the crafting plan engine",
-            "(special recipes routing/solving, DAG planner, gate/quota execution).",
-            "Default: false"
-        })
-        public boolean debugMode = false;
-    }
-
     @Config.Name("Terminal")
     @Config.Comment({
         "Omni Terminal settings."
     })
     public static Terminal terminal = new Terminal();
+
+    @Config.Name("CraftingDisplay")
+    @Config.Comment({
+        "Crafting plan / crafting CPU status GUI display settings.",
+        "Client-side only; stores the player's preferred sort modes.",
+        "Changed in-game via the sort button in each GUI."
+    })
+    public static CraftingDisplay craftingDisplay = new CraftingDisplay();
 
     @Config.Name("OmniTool")
     @Config.Comment({
@@ -588,6 +595,23 @@ public class AE2EnhancedConfig {
         DEFAULT
     }
 
+    public static class CraftingDisplay {
+
+        @Config.Comment({
+            "Sort mode of the craft confirm (plan) GUI item list.",
+            "Valid values: MISSING_FIRST, TOTAL_DESC, TO_CRAFT_DESC, SPECIAL_FIRST.",
+            "Default: MISSING_FIRST"
+        })
+        public String confirmSortMode = "MISSING_FIRST";
+
+        @Config.Comment({
+            "Sort mode of the crafting CPU status GUI item list.",
+            "Valid values: ACTIVE_FIRST, DURATION_DESC, TOTAL_DESC.",
+            "Default: ACTIVE_FIRST"
+        })
+        public String cpuSortMode = "ACTIVE_FIRST";
+    }
+
     public static class Terminal {
         @Config.Comment({
             "Maximum number of stored item types before disabling fuzzy @ mod search.",
@@ -936,13 +960,6 @@ public class AE2EnhancedConfig {
         })
         @Config.RangeInt(min = 1, max = 200)
         public int virtualParticleDurationTicks = 30;
-
-        @Config.Comment({
-            "Enable debug logging for virtual batch crafting in Central ME Interface.",
-            "When enabled, failed virtual batches will print reasons to the server log.",
-            "Default: false"
-        })
-        public boolean debugVirtualBatch = false;
     }
 
     public static class Thaumcraft {

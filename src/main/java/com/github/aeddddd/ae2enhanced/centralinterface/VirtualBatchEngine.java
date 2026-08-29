@@ -11,6 +11,8 @@ import appeng.util.item.AEItemStack;
 import appeng.me.GridAccessException;
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
+import com.github.aeddddd.ae2enhanced.diag.DiagLog;
+import com.github.aeddddd.ae2enhanced.diag.DiagSwitch;
 import com.github.aeddddd.ae2enhanced.network.packet.PacketVirtualCraftingParticles;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
@@ -460,11 +462,12 @@ public class VirtualBatchEngine {
     }
 
     /**
-     * 记录虚拟合成失败原因。默认只在 debug 日志开启时输出，避免刷屏。
+     * 记录虚拟合成失败原因。默认只在 virtualbatch 诊断开关开启时输出，避免刷屏。
+     * 开关控制：/ae2e debug virtualbatch on|off。
      */
     private void logFail(World world, TargetBinding target, String reason) {
-        if (AE2EnhancedConfig.centralInterface.debugVirtualBatch && !world.isRemote) {
-            AE2Enhanced.LOGGER.debug("[AE2E-VirtBatch] fail at {}: {}", target.pos, reason);
+        if (!world.isRemote) {
+            DiagLog.info(DiagSwitch.VIRTUAL_BATCH, "[AE2E-VirtBatch] fail at {}: {}", target.pos, reason);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.github.aeddddd.ae2enhanced.integration.jei;
 
+import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.client.gui.GuiSmartPatternInterface;
 import com.github.aeddddd.ae2enhanced.client.gui.jei.GhostIngredientTarget;
 import com.github.aeddddd.ae2enhanced.container.ContainerSmartPatternInterface;
@@ -98,7 +99,7 @@ public class SmartPatternInterfaceGhostHandler implements IGhostIngredientHandle
                     )
                 );
             } catch (java.io.IOException e) {
-                e.printStackTrace();
+                AE2Enhanced.LOGGER.error("发送 JEI ghost 物品到服务端失败", e);
             }
         }
     }

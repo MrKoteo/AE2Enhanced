@@ -4,6 +4,8 @@ import appeng.crafting.CraftingJob;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
 import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
+import com.github.aeddddd.ae2enhanced.diag.DiagEvents;
+import com.github.aeddddd.ae2enhanced.diag.metrics.MetricsRegistry;
 import com.github.aeddddd.ae2enhanced.mixin.bridge.ICraftingJobBudgetAccess;
 
 /**
@@ -61,6 +63,9 @@ public final class NativeCalcBudget {
                 && ((ICraftingJobBudgetAccess) job).ae2enhanced$nativeCalcAborted()) {
             AE2Enhanced.LOGGER.warn("[合成计划] 原生计算超预算({}ms)已中断,计划按缺料处理(不可提交): {}",
                     AE2EnhancedConfig.crafting.nativeCalcBudgetMs, job.getOutput());
+            MetricsRegistry.counter("crafting.nativeCalcAbort").increment();
+            DiagEvents.warn("crafting", "原生计算超预算(" + AE2EnhancedConfig.crafting.nativeCalcBudgetMs
+                    + "ms)已中断: " + job.getOutput());
             return true;
         }
         return false;

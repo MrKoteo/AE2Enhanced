@@ -1,11 +1,14 @@
 package com.github.aeddddd.ae2enhanced.specialcrafting;
 
-import com.github.aeddddd.ae2enhanced.AE2Enhanced;
-import com.github.aeddddd.ae2enhanced.config.AE2EnhancedConfig;
+import com.github.aeddddd.ae2enhanced.diag.DiagLog;
+import com.github.aeddddd.ae2enhanced.diag.DiagSwitch;
 
 /**
- * 特殊配方/DAG 计划引擎诊断日志门控:仅在配置 debug.debugMode = true 时输出.
- * 配置未加载(单元测试等环境)时按开启处理(测试可见断言日志).
+ * 特殊配方/DAG 计划引擎诊断日志门控.
+ *
+ * <p>已迁移为 {@link DiagLog} 的转发壳（开关 {@link DiagSwitch#SPECIAL_CRAFTING}），
+ * 保留原 API 使既有调用点零改动。默认关闭，运行期用
+ * {@code /ae2e debug specialcrafting on|off} 控制。</p>
  */
 public final class SpecialLog {
 
@@ -13,22 +16,14 @@ public final class SpecialLog {
     }
 
     public static boolean isEnabled() {
-        try {
-            return AE2EnhancedConfig.debug == null || AE2EnhancedConfig.debug.debugMode;
-        } catch (Throwable t) {
-            return true;
-        }
+        return DiagLog.isEnabled(DiagSwitch.SPECIAL_CRAFTING);
     }
 
     public static void info(String message, Object... args) {
-        if (isEnabled()) {
-            AE2Enhanced.LOGGER.info(message, args);
-        }
+        DiagLog.info(DiagSwitch.SPECIAL_CRAFTING, message, args);
     }
 
     public static void warn(String message, Object... args) {
-        if (isEnabled()) {
-            AE2Enhanced.LOGGER.warn(message, args);
-        }
+        DiagLog.warn(DiagSwitch.SPECIAL_CRAFTING, message, args);
     }
 }

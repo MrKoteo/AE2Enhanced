@@ -20,6 +20,7 @@ import appeng.crafting.MECraftingInventory;
 import appeng.hooks.TickHandler;
 
 import com.github.aeddddd.ae2enhanced.AE2Enhanced;
+import com.github.aeddddd.ae2enhanced.diag.plan.PlanTracker;
 import com.github.aeddddd.ae2enhanced.specialcrafting.Ae2CraftingReflect;
 import com.github.aeddddd.ae2enhanced.specialcrafting.NativeCalcBudget;
 import com.github.aeddddd.ae2enhanced.specialcrafting.SpecialLog;
@@ -75,6 +76,9 @@ public class DagCraftingJob extends CraftingJob
 
     @Override
     public void run() {
+        long planStart = System.nanoTime();
+        // 标记是否经 super.run() 回落原生——该路径已由 MixinCraftingJob 的 run RETURN 钩子计数,避免重复
+        boolean delegatedToNative = false;
         try {
             TickHandler.INSTANCE.registerCraftingSimulation(this.world, this);
             Ae2CraftingReflect.handlePausing(this);
@@ -85,6 +89,7 @@ public class DagCraftingJob extends CraftingJob
                 // 回落原生:挂计算预算——病态计划的原生递归可能永不结束,
                 // 而下单流程(如 RandomComplement 的 setJob 混入)会同步阻塞服务器线程
                 NativeCalcBudget.arm(this);
+                delegatedToNative = true;
                 super.run();
                 NativeCalcBudget.warnIfAborted(this);
                 return;
@@ -105,8 +110,13 @@ public class DagCraftingJob extends CraftingJob
             AE2Enhanced.LOGGER.warn("DAG 计划异常,回落原生计算: {}", t.toString());
             Ae2CraftingReflect.setAvailableCheck(this, null);
             NativeCalcBudget.arm(this);
+            delegatedToNative = true;
             super.run();
             NativeCalcBudget.warnIfAborted(this);
+        } finally {
+            if (!delegatedToNative) {
+                PlanTracker.onJobComputed(this, System.nanoTime() - planStart);
+            }
         }
     }
 

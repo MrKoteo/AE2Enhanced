@@ -145,7 +145,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                     if (!stack.isEmpty()) result.add(stack);
                 }
             }
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] revertMaterials RuneAltar: {} items at {}", result.size(), pos);
             return result;
         } else if (BotaniaReflectionHelper.isInstance(BotaniaReflectionHelper.CLASS_TILE_ALTAR, te)) {
             List<ItemStack> result = new ArrayList<>();
@@ -163,7 +162,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                     item.setDead();
                 }
             }
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] revertMaterials Altar: {} items at {}", result.size(), pos);
             return result;
         }
         // 对于 Pool / AlfPortal / TerraPlate 等通过 EntityItem 推料的设备,
@@ -171,14 +169,11 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
         List<ItemStack> fallback = new ArrayList<>();
         for (EntityItem item : getEntityItemsInAABB(world, pos)) {
             boolean isInput = item.getEntityData().getBoolean(TAG_INPUT_FLAG);
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] revertMaterials scan at {}: {} inputFlag={} dead={}",
-//                     pos, item.getItem(), isInput, item.isDead);
             if (!item.isDead && !item.getItem().isEmpty() && isInput) {
                 fallback.add(item.getItem().copy());
                 item.setDead();
             }
         }
-//         AE2Enhanced.LOGGER.debug("[AE2E-Botania] revertMaterials Pool/Portal/Terra: {} items at {}", fallback.size(), pos);
         return fallback;
     }
 
@@ -269,49 +264,29 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
             if (stack.isEmpty()) continue;
             Object recipe = BotaniaReflectionHelper.getPoolMatchingRecipe(stack, world.getBlockState(pos.down()));
             if (recipe == null) {
-//                 AE2Enhanced.LOGGER.debug("[AE2E-Botania] canStartPool failed: no recipe for {} at {}", stack, pos);
                 return false;
             }
             totalManaNeeded += BotaniaReflectionHelper.manaInfusionGetManaToConsume(recipe) * stack.getCount();
         }
-        boolean manaOk = BotaniaReflectionHelper.getPoolCurrentMana(pool) >= totalManaNeeded;
-        if (!manaOk) {
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] canStartPool failed: need {} mana, pool has {} at {}",
-//                     totalManaNeeded, pool.getCurrentMana(), pos);
-        } else {
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] canStartPool ok: need {} mana, pool has {} at {}",
-//                     totalManaNeeded, pool.getCurrentMana(), pos);
-        }
-        return manaOk;
+        return BotaniaReflectionHelper.getPoolCurrentMana(pool) >= totalManaNeeded;
     }
 
     private boolean pushMaterialsPool(World world, BlockPos pos, Object pool, InventoryCrafting ingredients) {
-//         AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool start at {}", pos);
-
         // 清理 AABB 中已有的中枢输入标记实体,防止实体堆叠干扰 collideEntityItem
         for (EntityItem existing : getEntityItemsInAABB(world, pos)) {
             if (!existing.isDead && existing.getEntityData().getBoolean(TAG_INPUT_FLAG)) {
                 existing.setDead();
-//                 AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool cleaned leftover input entity: {} at {}",
-//                         existing.getItem(), pos);
             }
         }
 
         for (int i = 0; i < ingredients.getSizeInventory(); i++) {
             ItemStack stack = ingredients.getStackInSlot(i);
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool slot {}: stack=[count={}, item={}, class={}, hash={}, empty={}]",
-//                     i, stack.getCount(), stack.getItem(), stack.getClass().getName(), System.identityHashCode(stack), stack.isEmpty());
             if (stack.isEmpty()) continue;
 
             // 每次只推送 1 个,collideEntityItem 每次消耗 1 个
             ItemStack remaining = stack.copy();
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool slot {}: remaining copy=[count={}, item={}, hash={}, empty={}]",
-//                     i, remaining.getCount(), remaining.getItem(), System.identityHashCode(remaining), remaining.isEmpty());
             while (!remaining.isEmpty()) {
-                int countBefore = remaining.getCount();
                 ItemStack single = remaining.splitStack(1);
-//                 AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool slot {} split: beforeCount={}, afterCount={}, single=[count={}, item={}, hash={}, empty={}]",
-//                         i, countBefore, remaining.getCount(), single.getCount(), single.getItem(), System.identityHashCode(single), single.isEmpty());
                 if (single.isEmpty()) {
                     AE2Enhanced.LOGGER.warn("[AE2E-Botania] pushMaterialsPool: splitStack returned empty! Aborting slot. remainingCount={}, remainingItem={}",
                             remaining.getCount(), remaining.getItem());
@@ -326,8 +301,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                 entityItem.motionY = 0;
                 entityItem.motionZ = 0;
                 world.spawnEntity(entityItem);  // 必须加入世界,否则产物不会出现在世界中
-//                 AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool spawned entityItem: item={} hash={}",
-//                         entityItem.getItem(), System.identityHashCode(entityItem));
 
                 boolean consumed = BotaniaReflectionHelper.poolCollideEntityItem(pool, entityItem);
                 // WORKAROUND: 某些整合包中 collideEntityItem 执行了成功路径(shrink+spawn产物)
@@ -339,8 +312,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                         actualPickupDelay = (Integer) net.minecraftforge.fml.relauncher.ReflectionHelper.getPrivateValue(
                                 EntityItem.class, entityItem, "field_145804_b", "pickupDelay");
                     } catch (Exception ignored) {}
-//                     AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool failed: collideEntityItem refused {} (item={} dead={} pickupDelay={}) at {} (mana={})",
-//                             single, entityItem.getItem(), entityItem.isDead, actualPickupDelay, pos, pool.getCurrentMana());
                     // 清理已 spawn 的实体,避免空实体堆积
                     if (!entityItem.isDead) {
                         entityItem.setDead();
@@ -353,15 +324,12 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                 if (!entityItem.getItem().isEmpty()) {
                     // 防御性处理：如果某个魔改版本把产物塞回了原 EntityItem
                     ItemStack product = entityItem.getItem();
-//                     AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool product kept in original entity: {} -> {} at {}",
-//                             single, product, pos);
                     entityItem.getEntityData().removeTag(TAG_INPUT_FLAG);
                 } else {
                     entityItem.setDead();
                 }
             }
         }
-//         AE2Enhanced.LOGGER.debug("[AE2E-Botania] pushMaterialsPool success at {}", pos);
         return true;
     }
 
@@ -1075,7 +1043,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
         List<EntityItem> items = getEntityItemsInAABB(world, pos);
         List<ItemStack> collected = new ArrayList<>();
         if (expectedOutputs == null || expectedOutputs.length == 0) {
-//             AE2Enhanced.LOGGER.debug("[AE2E-Botania] collectMatchingEntityItems: no expectedOutputs at {}", pos);
             return collected;
         }
 
@@ -1086,7 +1053,6 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
             ItemStack stack = entityItem.getItem();
             if (stack.isEmpty()) continue;
 
-            boolean matched = false;
             for (IAEItemStack expected : expectedOutputs) {
                 if (expected == null) continue;
                 ItemStack expectedStack = expected.createItemStack();
@@ -1099,17 +1065,10 @@ public class BotaniaHandler implements IRemoteHandler, IVirtualBatchCraftingHand
                         ItemStack taken = stack.splitStack(toCollect);
                         collected.add(taken);
                     }
-                    matched = true;
-//                     AE2Enhanced.LOGGER.debug("[AE2E-Botania] collectMatchingEntityItems matched: {} -> collect {} at {}",
-//                             stack, toCollect, pos);
                     break;
                 }
             }
-            if (!matched) {
-//                 AE2Enhanced.LOGGER.debug("[AE2E-Botania] collectMatchingEntityItems unmatched: {} at {}", stack, pos);
-            }
         }
-//         AE2Enhanced.LOGGER.debug("[AE2E-Botania] collectMatchingEntityItems result: {} items at {}", collected.size(), pos);
         return collected;
     }
 

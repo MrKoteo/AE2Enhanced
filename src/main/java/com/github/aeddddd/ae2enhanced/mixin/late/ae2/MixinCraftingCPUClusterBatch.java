@@ -46,9 +46,6 @@ import java.util.Map;
 public abstract class MixinCraftingCPUClusterBatch {
 
     @Unique
-    private static final boolean CRAZYAE_LOADED =
-        net.minecraftforge.fml.common.Loader.isModLoaded("crazyae");
-
     @Shadow
     private boolean isComplete;
 
@@ -123,9 +120,6 @@ public abstract class MixinCraftingCPUClusterBatch {
 
     @Inject(method = "updateCraftingLogic", at = @At("HEAD"))
     private void onUpdateCraftingLogicHead(IGrid grid, IEnergyGrid eg, CraftingGridCache cache, CallbackInfo ci) {
-        // CrazyAE 通过 ASM 大幅修改了 CraftingCPUCluster,虚拟集群的字段初始化
-        // 与其状态机不兼容；跳过我们的 HEAD 注入以避免干扰 CrazyAE 逻辑.
-        if (((IComputationCoreAccess) this).ae2enhanced$getComputationCore() != null && CRAZYAE_LOADED) return;
         try {
             CraftingCPUCluster self = (CraftingCPUCluster) (Object) this;
             if (SpecialCraftingRuntime.isSpecialCluster(self)) {
@@ -173,9 +167,6 @@ public abstract class MixinCraftingCPUClusterBatch {
 
     @Inject(method = "executeCrafting", at = @At("HEAD"))
     private void batchProcessVirtualTasks(IEnergyGrid energy, CraftingGridCache cache, CallbackInfo ci) {
-        // CrazyAE 兼容：跳过批量合成注入,避免与其修改后的 executeCrafting 冲突.
-        if (((IComputationCoreAccess) this).ae2enhanced$getComputationCore() != null && CRAZYAE_LOADED) return;
-
         // 性能早退：网络中不存在装配中枢时,批量结算不可能命中,
         // 直接跳过——getMediums 的 map 查找会对每个任务触发样板 equals/hashCode
         // 的深层 NBT 比较,是合成 CPU 每 tick 的主要开销之一(spark 采样确认).
@@ -342,8 +333,8 @@ public abstract class MixinCraftingCPUClusterBatch {
                                     IAEItemStack product = outputTemplate.copy();
                                     product.setStackSize(totalCount);
                                     itemList.add(product);
-                                    // 直接写入底层 IItemList,绕过 injectItems,需显式递增库存版本号
-                                    ((IMeInventoryVersionAccess) meInv).ae2e$bumpVersion();
+                                    // 直接写入底层 IItemList,绕过 injectItems,需显式递增库存注入版本号
+                                    ((IMeInventoryVersionAccess) meInv).ae2e$bumpInjectVersion();
                                     this.postChange(product.copy(), source);
                                     this.postCraftingStatusChange(product.copy());
 
@@ -622,8 +613,8 @@ public abstract class MixinCraftingCPUClusterBatch {
                                 IAEItemStack product = outputTemplate.copy();
                                 product.setStackSize(totalCount);
                                 itemList.add(product);
-                                // 直接写入底层 IItemList,绕过 injectItems,需显式递增库存版本号
-                                ((IMeInventoryVersionAccess) meInv).ae2e$bumpVersion();
+                                // 直接写入底层 IItemList,绕过 injectItems,需显式递增库存注入版本号
+                                ((IMeInventoryVersionAccess) meInv).ae2e$bumpInjectVersion();
                                 this.postChange(product.copy(), source);
                                 this.postCraftingStatusChange(product.copy());
 
